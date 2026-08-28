@@ -53,9 +53,13 @@ export default function App() {
               {session.patientRef} · {session.domain}
             </span>
           )}
-          {/* A clinician must never mistake a demo for a recording; say so on
-              every screen, not in a settings page nobody opens. */}
-          {info?.synthetic && <span className="kr-chip kr-chip--warn">Synthetic signal</span>}
+          {/* A clinician must never mistake a demo for a recording, so the
+              warning rides every LIVE screen. The report is the finished
+              document: its provenance belongs to the report content, not to
+              whatever mode the API happens to be in while viewing it. */}
+          {info?.synthetic && phase !== 'report' && (
+            <span className="kr-chip kr-chip--warn">Synthetic signal</span>
+          )}
         </div>
       </div>
 
