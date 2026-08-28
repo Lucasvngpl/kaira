@@ -1,0 +1,7 @@
+brainflow
+mne
+antio
+scipy
+numpy
+fastapi
+uvicorn

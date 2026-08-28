@@ -1,0 +1,13 @@
+# Dataset files are 25-29 MB each; they never enter the repo (HANDOFF section 4).
+# data/* + negation (instead of data/) so the empty folder itself stays tracked.
+data/*
+!data/.gitkeep
+
+.venv/
+__pycache__/
+*.npz
+
+node_modules/
+dist/
+
+.DS_Store
