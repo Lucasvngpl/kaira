@@ -8,6 +8,7 @@ never signal values.
 
 from __future__ import annotations
 
+import math
 import sys
 import time
 from pathlib import Path
@@ -15,6 +16,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import decide
+import features
 import session as session_mod
 
 
@@ -51,19 +53,44 @@ def run() -> None:
     assert len(rep["tasks"]) == 4 and rep["mean_rt"] == 6.8
     assert {"n", "task_id", "level", "result", "load", "trusted", "rt", "action", "reason", "flag"} <= set(rep["tasks"][0])
 
-    # --- flag plumbing: a disengagement verdict must hold level and be counted
-    real_decide = decide.decide
-    decide.decide = lambda state, trial: ("flag", "incorrect_disengaged")
+    # --- four-quadrant wiring: injected loads through a quadrant stand-in ----
+    # The placeholder decide ignores load, so until the real algorithm lands,
+    # prove the wiring (load -> trial -> action -> level/flag/report) with a
+    # stand-in that implements the four quadrants and hand-made load values.
+    lo, hi = decide.LOAD_BAND
+
+    def quadrant(state, trial):
+        if trial.result == "correct":
+            return ("advance", "correct_easy") if trial.load < lo else ("hold", "correct_engaged")
+        return ("flag", "incorrect_disengaged") if trial.load < lo else ("ease", "incorrect_engaged")
+
+    current = [0.0]  # absolute log-load the injected load_index reports
+    real_decide, real_load_index = decide.decide, features.load_index
+    decide.decide = quadrant
+    features.load_index = lambda window, fs, ch_names: current[0]
     try:
         s2 = session_mod.begin("PT-TEST2", "Memory")
         time.sleep(0.35)
-        s2.baseline_status()
-        t = s2.next_task()
-        r = s2.submit_answer(t["task_id"], "incorrect", 3.0)
-        assert r["action"] == "flag" and r["next_level"] == 3, "flag must not move the level"
-        assert s2.report()["disengaged_count"] == 1 and s2.report()["tasks"][0]["flag"]
+        s2.baseline_status()  # baseline log = 0.0, so multiples come out as exp(sample)
+        quadrants = [
+            # (load multiple, result, expected action, level after, flagged)
+            (0.6, "correct", "advance", 4, False),  # right without effort -> harder
+            (1.5, "correct", "hold", 4, False),  # right at useful effort -> hold
+            (2.0, "incorrect", "ease", 3, False),  # wrong while working -> easier
+            (0.5, "incorrect", "flag", 3, True),  # wrong without effort -> disengaged, hold
+        ]
+        for multiple, result, action, level_after, flagged in quadrants:
+            current[0] = math.log(multiple)
+            t = s2.next_task()
+            r = s2.submit_answer(t["task_id"], result, 4.0)
+            assert (r["action"], r["next_level"]) == (action, level_after), (r, action, level_after)
+        rep2 = s2.report()
+        assert rep2["disengaged_count"] == 1 and rep2["tasks"][3]["flag"]
+        assert [round(t["load"], 1) for t in rep2["tasks"]] == [0.6, 1.5, 2.0, 0.5]
+        assert not s2.ended, "no three-correct run happened, so no convergence"
     finally:
         decide.decide = real_decide
+        features.load_index = real_load_index
 
     # --- cap path: timeouts bounce off level 1 until the task cap ends it ---
     s3 = session_mod.begin("PT-TEST3", "Memory")

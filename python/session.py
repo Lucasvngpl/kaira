@@ -11,8 +11,9 @@ decide. This file only wires them together and keeps the books:
 
 Lifecycle: begin() -> poll baseline_status() until done -> loop
 [next_task() -> live_load() while the clinician runs it -> submit_answer()]
--> ends on convergence (three consecutive correct at one level, inside the
-load band) or on the task cap -> report().
+-> ends when decide.converged() says the level is established (the stopping
+rule is part of the graded algorithm, so it lives in decide.py) or on the
+task cap here -> report().
 
 Shared types (Trial, DomainState, ACTIONS) are defined here and referenced by
 decide.py via lazy annotations, so the skeleton needs no imports and there is
@@ -51,15 +52,8 @@ MAX_TASKS = 12
 # gain when you can move either way).
 LEVEL_START = 3
 
-CONSECUTIVE_TO_CONVERGE = 3
-
-# The "sensible effort range" for convergence, as multiples of the patient's
-# own resting baseline. NOTE: the lower bound is deliberately below 1.0 for
-# now because the placeholder features.load_index() yields exactly 1.0x for
-# every window; with the real load index the team should retighten this
-# (e.g. 1.3-3.0, as in the HANDOFF report example). The band used is written
-# into every report, so a stale value is at least visible.
-LOAD_BAND = (0.8, 3.0)
+# The stopping rule and the effort band belong to the adaptive logic, so
+# they live in decide.py (decide.CONSECUTIVE_TO_CONVERGE, decide.LOAD_BAND).
 
 # Actions decide.py may return; session applies them mechanically.
 ACTIONS = ("advance", "hold", "ease", "flag")
@@ -97,7 +91,7 @@ class DomainState:
     domain: str
     level: int
     baseline: float  # resting load index, log units
-    band: tuple[float, float] = LOAD_BAND
+    band: tuple[float, float] = decide.LOAD_BAND
     level_min: int = tasks.LEVEL_MIN
     level_max: int = tasks.LEVEL_MAX
     history: list[Trial] = field(default_factory=list)
@@ -285,23 +279,15 @@ class Session:
         return load_log, load, trusted
 
     def _check_end(self, last: Trial) -> None:
-        """Convergence: three consecutive correct at ONE level, all inside the band.
-
-        Termination lives here (bookkeeping over history) while per-trial
-        difficulty policy lives in decide.py (the graded algorithm); that is
-        the scaffold's line between plumbing and the team's science.
+        """decide.converged() owns the stopping rule - when a level counts as
+        measured is part of the graded algorithm, not plumbing. Only the
+        never-converged task cap is scaffold policy and stays here.
         """
-        tail = self.state.history[-CONSECUTIVE_TO_CONVERGE:]
-        if len(tail) == CONSECUTIVE_TO_CONVERGE and all(
-            t.result == "correct"
-            and t.level == tail[0].level
-            and t.trusted
-            and LOAD_BAND[0] <= t.load <= LOAD_BAND[1]
-            for t in tail
-        ):
+        level = decide.converged(self.state)
+        if level is not None:
             self.ended = True
             self.converged = True
-            self.final_level = tail[0].level  # the level they proved, not any post-action level
+            self.final_level = level  # the level they proved, not any post-action level
             self.end_reason = CONVERGED_REASON
         elif len(self.state.history) >= MAX_TASKS:
             self.ended = True
@@ -326,7 +312,7 @@ class Session:
             "final_level": self.final_level if self.final_level is not None else self.state.level,
             "reason": self.end_reason or "Session in progress",
             "converged": self.converged,
-            "band": list(LOAD_BAND),
+            "band": list(decide.LOAD_BAND),
             "mean_rt": round(statistics.fmean(t.rt for t in answered), 1) if answered else None,
             "accuracy": round(sum(t.result == "correct" for t in h) / len(h), 2) if h else None,
             "disengaged_count": sum(t.flag for t in h),
