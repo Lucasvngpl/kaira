@@ -52,7 +52,7 @@ def run() -> None:
     assert rep["reason"] == session_mod.CONVERGED_REASON
     assert rep["accuracy"] == 0.75 and rep["disengaged_count"] == 0
     assert len(rep["tasks"]) == 4 and rep["mean_rt"] == 6.8
-    assert {"n", "task_id", "level", "result", "load", "trusted", "rt", "action", "reason", "flag"} <= set(rep["tasks"][0])
+    assert {"n", "task_id", "kind", "level", "result", "load", "trusted", "rt", "action", "reason", "flag"} <= set(rep["tasks"][0])
 
     # --- four-quadrant wiring: injected loads through a quadrant stand-in ----
     # The placeholder decide ignores load, so until the real algorithm lands,

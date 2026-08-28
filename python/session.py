@@ -74,6 +74,7 @@ class Trial:
 
     n: int
     task_id: str
+    kind: str  # word_list | digit_span | ... - the report shows humans a name, not an id
     level: int
     result: str  # "correct" | "incorrect" | "timeout"
     rt: float  # seconds, from the clinician's stopwatch
@@ -234,6 +235,7 @@ class Session:
         trial = Trial(
             n=len(self.state.history) + 1,
             task_id=task_id,
+            kind=self._current.kind,
             level=self.state.level,
             result=result,
             rt=round(float(elapsed_seconds), 1),
@@ -323,6 +325,7 @@ class Session:
                 {
                     "n": t.n,
                     "task_id": t.task_id,
+                    "kind": t.kind,
                     "level": t.level,
                     "result": t.result,
                     "load": t.load,

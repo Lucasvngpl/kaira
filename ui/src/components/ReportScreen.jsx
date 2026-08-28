@@ -29,6 +29,7 @@ const BAR = '#7bb095';
 const FLAG = '#f59e0b';
 const LINE = '#237a4e';
 const TICK = '#64748b';
+const AXIS = '#c8ccd8'; // drawn axis lines, hairline slate like the sketch's pen strokes
 
 const RESULT_PILL = {
   correct: ['kr-pill--good', 'Right'],
@@ -41,6 +42,15 @@ const ACTION_COPY = {
   hold: 'Held level',
   ease: 'Eased difficulty',
   flag: 'Flagged disengagement',
+};
+
+// Task kinds -> clinician-facing names; the machine id stays as a small
+// second line for cross-referencing with tasks.py.
+const KIND_COPY = {
+  word_list: 'Word recall',
+  digit_span: 'Digit span',
+  digit_span_backward: 'Digit span, reverse',
+  paired_associates: 'Paired associates',
 };
 
 // One sentence, two homes: the report foot and the expand modal, so the
@@ -264,7 +274,7 @@ export default function ReportScreen({ sessionId, onNewSession, demo = false }) 
       <ComposedChart data={tasks} margin={{ top: 24, right: 8, left: 8, bottom: 14 }}>
         <XAxis
           dataKey="n"
-          axisLine={false}
+          axisLine={{ stroke: AXIS }}
           tickLine={false}
           tick={{ fontSize: 12, fill: TICK }}
           label={{ value: 'Question number', position: 'insideBottom', offset: -12, fontSize: 12, fill: TICK }}
@@ -277,14 +287,14 @@ export default function ReportScreen({ sessionId, onNewSession, demo = false }) 
             gutter and throwing its tick labels off-canvas. */}
         <YAxis
           yAxisId="load"
-          axisLine={false}
-          tickLine={false}
+          axisLine={{ stroke: AXIS }}
+          tickLine={{ stroke: AXIS }}
           width={56}
           domain={[0, (dataMax) => Math.max(Math.ceil(dataMax * 1.15), 1)]}
           allowDecimals={false}
           tick={{ fontSize: 12, fill: TICK }}
           label={{
-            value: 'Cognitive load (\u00d7 baseline)',
+            value: 'Cognitive load',
             angle: -90,
             position: 'insideLeft',
             offset: 4,
@@ -429,8 +439,11 @@ export default function ReportScreen({ sessionId, onNewSession, demo = false }) 
                 return (
                   <tr key={t.n} className={t.flag ? 'rp-row--flag' : undefined}>
                     <td data-label="#">{t.n}</td>
-                    <td data-label="Task" className="rp-taskid">
-                      {t.task_id}
+                    <td data-label="Task">
+                      <span className="rp-response">
+                        {KIND_COPY[t.kind] || t.task_id}
+                        <span className="rp-taskid">{t.task_id}</span>
+                      </span>
                     </td>
                     <td data-label="Level">{t.level}</td>
                     <td data-label="Result">

@@ -205,8 +205,11 @@
   margin-left: 8px;
 }
 
+/* The machine id under the human task name. */
 .rp-taskid {
-  font-size: 0.82rem;
+  display: block;
+  margin-top: 2px;
+  font-size: 0.78rem;
   color: var(--text-tertiary);
   font-variant-numeric: tabular-nums;
 }
@@ -269,9 +272,10 @@
   }
 }
 
-/* Non-diagnostic note: quiet, but present on every report and in the modal. */
+/* Non-diagnostic note: quiet, but present on every report and in the modal.
+   Clear air above it so it reads as a page footnote, not table spillover. */
 .rp-disclaimer {
-  margin: 4px 0 0;
+  margin: 18px 0 0;
   font-size: 12.5px;
   line-height: 1.5;
   color: var(--text-tertiary);
