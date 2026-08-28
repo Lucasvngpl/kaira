@@ -13,7 +13,9 @@ Everything else (`session.py`, `tasks.py`, `api/`, `ui/`) is scaffold and fair g
 ## The data is fake until the real pipeline lands
 
 - `features.load_index` placeholder returns a constant, so every load reads exactly 1.00x baseline: the live sparkline is flat and the report bars are uniform. This is expected, not a bug.
-- Proper testing data comes later, once the team's real signal code exists. The ANT Neuro recordings already live in `~/NOVA_ANT` (`EEG_flipcup`, `Eyes open eyes closed`, `Behavioral Data`, `Video`); copy what is needed into `data/` (gitignored).
+- Kaira is a LIVE closed loop: a session's EEG is recorded from the eego amplifier in real time and feeds the next-task decision as it happens. No prerecorded file ever drives a session.
+- `~/NOVA_ANT` (`EEG_flipcup`, `Eyes open eyes closed`, `Behavioral Data`, `Video`) holds EXAMPLE recordings from the same hardware, for validating the signal code offline only: the EO-EC 33x occipital-alpha check, and whether the load metric separates flip-cup outcomes. Copy what is needed into `data/` (gitignored).
+- So "proper data to test with" arrives in two steps: first the offline validation against those examples once `features.py` is real, then live closed-loop runs (synthetic board anywhere, the real amplifier on Windows).
 - Until then, never judge visuals or adaptive behaviour by the flat values; verify wiring with injected values instead (`python/smoke_test.py`, four-quadrant section).
 - `decide.LOAD_BAND`'s 0.8 floor exists only so the placeholder can converge. Retighten to ~1.3-3.0 once real data lands, or the disengagement flag can never fire.
 
@@ -21,7 +23,7 @@ Everything else (`session.py`, `tasks.py`, `api/`, `ui/`) is scaffold and fair g
 
 - Challenge handout: `~/Downloads/Challenge Handout (2).pdf` (requirements, judging, deliverables).
 - Hardware: eego amplifier EE-22x user manual `~/Downloads/UDO-SM-0120_ENrev11 eego amplifier EE-22x User Manual 2025-07-01_02 (1).pdf`; waveguard CA-208 cap datasheet `~/Downloads/UDO-SM-0215rev09 CA-208 Datasheet 2020-12-14 (1).pdf`.
-- Dataset and stimulus material: `~/NOVA_ANT`.
+- Example recordings and stimulus material (offline validation only, never the live loop): `~/NOVA_ANT`.
 - Load-index literature (the science behind `features.load_index`):
   - Dan and Reiner 2017, Int J Psychophysiol (PMID 27592084): defines the cognitive load index as frontal theta (Fz) power over parietal alpha (Pz) power - the ratio Kaira uses.
   - Borghini et al. 2015, IEEE EMBC (PMID 26737704): the same frontal-theta / parietal-alpha ratio as a mental workload index, validated on helicopter pilots.

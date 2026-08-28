@@ -99,7 +99,8 @@ Keep it green while filling in the skeletons.
 
 ## Dataset
 
-ANT Neuro supplied recordings from the exact competition hardware (25-29 MB each, so `data/` is gitignored).
+These are example recordings for validating the signal code offline; live sessions record from the amplifier in real time and never replay a file.
+ANT Neuro supplied them from the exact competition hardware (25-29 MB each, so `data/` is gitignored).
 Get them from the team drive and drop them in `data/`.
 `*_EO-EC.cnt` is the validation baseline: occipital alpha must come out ~33x higher with eyes closed, peaking at 10.2 Hz.
 `*_session-0*.cnt` are the labelled flip-cup trials for testing whether the load metric separates outcomes.
