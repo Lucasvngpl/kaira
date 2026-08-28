@@ -2,8 +2,9 @@
 // (start -> baseline -> run -> report), so screens are swapped on local state
 // rather than routed: a URL you could deep-link into the middle of a live
 // EEG session is a foot-gun, not a feature, and this app has no second flow.
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { getRoot } from './api.js';
+import usePoll from './hooks/usePoll.js';
 import StartScreen from './components/StartScreen.jsx';
 import BaselineScreen from './components/BaselineScreen.jsx';
 import RunScreen from './components/RunScreen.jsx';
@@ -15,11 +16,21 @@ export default function App() {
   const [info, setInfo] = useState(null); // GET / : {synthetic, domains}
   const [infoError, setInfoError] = useState('');
 
-  useEffect(() => {
-    getRoot()
-      .then(setInfo)
-      .catch(() => setInfoError('API not reachable on port 8300. Start it with: python api/main.py'));
-  }, []);
+  // Keep knocking until the API answers (it may start, or restart, after the
+  // UI): a one-shot check leaves a stale "not reachable" banner that only a
+  // manual refresh clears. Polling stops once the API has been seen.
+  usePoll(
+    async () => {
+      try {
+        setInfo(await getRoot());
+        setInfoError('');
+      } catch {
+        setInfoError('API not reachable on port 8300. Start it with: python api/main.py');
+      }
+    },
+    2000,
+    !info
+  );
 
   const startOver = () => {
     setPhase('start');
@@ -43,7 +54,7 @@ export default function App() {
       </div>
 
       {infoError && phase === 'start' && (
-        <p className="kr-error" role="alert">
+        <p className="kr-error kr-error--banner" role="alert">
           {infoError}
         </p>
       )}

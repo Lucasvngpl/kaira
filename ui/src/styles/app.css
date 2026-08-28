@@ -343,6 +343,12 @@ body {
   margin: 0.75rem 0 0;
 }
 
+/* Page-level notice (e.g. API unreachable): sits above a header, so it needs
+   bottom air instead of the inline top margin. */
+.kr-error--banner {
+  margin: 0 0 1.5rem;
+}
+
 .kr-hint {
   font-size: 13px;
   color: var(--text-tertiary);
