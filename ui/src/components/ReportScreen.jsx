@@ -7,12 +7,10 @@ import { FiCheck, FiCopy, FiDownload, FiMaximize2, FiX } from 'react-icons/fi';
 import { toBlob } from 'html-to-image';
 import {
   Bar,
-  CartesianGrid,
   Cell,
   ComposedChart,
   LabelList,
   Line,
-  ReferenceLine,
   ResponsiveContainer,
   XAxis,
   YAxis,
@@ -30,9 +28,7 @@ import '../styles/report.css';
 const BAR = '#7bb095';
 const FLAG = '#f59e0b';
 const LINE = '#237a4e';
-const GRID = '#e6e9ee';
 const TICK = '#64748b';
-const BAND_LINE = '#cbd5e1';
 
 const RESULT_PILL = {
   correct: ['kr-pill--good', 'Right'],
@@ -239,61 +235,76 @@ export default function ReportScreen({ sessionId, onNewSession, demo = false }) 
   const tasks = report.tasks;
   const nCorrect = tasks.filter((t) => t.result === 'correct').length;
   const anyFlag = tasks.some((t) => t.flag);
-  const [bandLo, bandHi] = report.band;
 
-  // Y-scale: data-driven with a floor that keeps the band's top line inside
-  // the plot (the band is the convergence criterion; hiding it would be
-  // worse than headroom). Rounded up to a half, ticks at whole numbers only,
-  // so flat placeholder data wastes at most the band's own headroom.
-  const maxLoad = Math.max(...tasks.map((t) => t.load), 0);
-  const loadTop = Math.max(Math.ceil(Math.max(maxLoad * 1.15, bandHi * 1.05) * 2) / 2, 1);
-  const loadTicks = Array.from({ length: Math.floor(loadTop) + 1 }, (_, i) => i);
+  // Level numeral rendered only at the start of a run (first task, or the
+  // level moved); recharts hands us the point's x/y and datum index.
+  const levelChangeLabel = ({ x, y, value, index }) => {
+    if (index > 0 && tasks[index - 1].level === value) return null;
+    return (
+      <text
+        x={x}
+        y={y - 12}
+        textAnchor="middle"
+        style={{
+          fontSize: 11,
+          fontWeight: 700,
+          fill: LINE,
+          stroke: '#ffffff',
+          strokeWidth: 3,
+          paintOrder: 'stroke',
+        }}
+      >
+        {value}
+      </text>
+    );
+  };
 
   const chartBody = (big) => (
     <ResponsiveContainer width="100%" height={big ? 460 : 280}>
-      <ComposedChart data={tasks} margin={{ top: 24, right: 8, left: 8, bottom: 0 }}>
-        <CartesianGrid vertical={false} strokeDasharray="4 4" stroke={GRID} />
+      <ComposedChart data={tasks} margin={{ top: 24, right: 8, left: 8, bottom: 14 }}>
         <XAxis
           dataKey="n"
           axisLine={false}
           tickLine={false}
           tick={{ fontSize: 12, fill: TICK }}
+          label={{ value: 'Question number', position: 'insideBottom', offset: -12, fontSize: 12, fill: TICK }}
         />
-        {/* One visible axis (load). A second labelled axis for level invited
-            reading a level against the load ruler; the level line carries its
-            own numbers instead, on a hidden scale so it never flattens. */}
+        {/* One visible, titled axis (load). The level line rides a separate
+            0-width scale so it never flattens into the load ruler; its own
+            numerals mark the level. NEVER use `hide` on that second axis:
+            recharts 3.10's axis-width pipeline breaks on hidden axes when the
+            chart mounts synchronously (modal, demo), collapsing THIS axis's
+            gutter and throwing its tick labels off-canvas. */}
         <YAxis
           yAxisId="load"
           axisLine={false}
           tickLine={false}
-          width={40}
-          domain={[0, loadTop]}
-          ticks={loadTicks}
+          width={56}
+          domain={[0, (dataMax) => Math.max(Math.ceil(dataMax * 1.15), 1)]}
+          allowDecimals={false}
           tick={{ fontSize: 12, fill: TICK }}
+          label={{
+            value: 'Cognitive load (\u00d7 baseline)',
+            angle: -90,
+            position: 'insideLeft',
+            offset: 4,
+            fontSize: 12,
+            fill: TICK,
+            style: { textAnchor: 'middle' },
+          }}
         />
-        <YAxis yAxisId="level" hide domain={[0.5, report.level_max + 0.5]} />
-        {/* Effort thresholds, not a data region: full-width dashed lines
-            (a ReferenceArea on a category axis stops at the category centres).
-            Each line names its value; the legend only says the band exists. */}
-        <ReferenceLine
-          yAxisId="load"
-          y={bandLo}
-          stroke={BAND_LINE}
-          strokeDasharray="6 4"
-          label={{ value: bandLo.toFixed(1), position: 'insideRight', fill: TICK, fontSize: 11, dy: -7 }}
-        />
-        <ReferenceLine
-          yAxisId="load"
-          y={bandHi}
-          stroke={BAND_LINE}
-          strokeDasharray="6 4"
-          label={{ value: bandHi.toFixed(1), position: 'insideRight', fill: TICK, fontSize: 11, dy: -7 }}
+        <YAxis
+          yAxisId="level"
+          width={0}
+          tick={false}
+          axisLine={false}
+          tickLine={false}
+          domain={[0.5, report.level_max + 0.5]}
         />
         {/* Entry animation only in the expand modal (big): there the layout is
             stable and the grow/draw reveal plays reliably, house-style. On the
             report's first mount the same animation races the container measure
-            and can leave bars unpainted and the line dash-hidden, so inline
-            renders static. */}
+            and can leave bars unpainted, so inline renders static. */}
         <Bar
           yAxisId="load"
           dataKey="load"
@@ -304,14 +315,8 @@ export default function ReportScreen({ sessionId, onNewSession, demo = false }) 
           {tasks.map((t) => (
             <Cell key={t.n} fill={t.flag ? FLAG : BAR} />
           ))}
-          {/* Inside the bar top, not above it: above-the-bar shared an anchor
-              with the level labels and the two collided on flat data. */}
-          <LabelList
-            dataKey="load"
-            position="insideTop"
-            formatter={(v) => v.toFixed(2)}
-            style={{ fontSize: 11, fontWeight: 700, fill: '#0f172a' }}
-          />
+          {/* No per-bar value labels (the original sketch has none): the axis
+              gives the scale and the task table below holds exact values. */}
         </Bar>
         <Line
           yAxisId="level"
@@ -322,51 +327,20 @@ export default function ReportScreen({ sessionId, onNewSession, demo = false }) 
           dot={{ r: 4, fill: '#ffffff', stroke: LINE, strokeWidth: 2 }}
           isAnimationActive={big}
         >
-          {/* White halo (paint-order stroke) keeps the green numeral legible
-              when a low-level dot sits on a green bar. */}
-          <LabelList
-            dataKey="level"
-            position="top"
-            offset={10}
-            style={{
-              fontSize: 11,
-              fontWeight: 700,
-              fill: LINE,
-              stroke: '#ffffff',
-              strokeWidth: 3,
-              paintOrder: 'stroke',
-            }}
-          />
+          {/* Sketch-density labelling: a numeral only where the level CHANGES,
+              so a held run reads as one quiet number instead of a row of
+              repeats. White halo keeps it legible over a bar. */}
+          <LabelList dataKey="level" content={levelChangeLabel} />
         </Line>
       </ComposedChart>
     </ResponsiveContainer>
   );
 
-  const legend = (
-    <ul className="rp-legend">
-      <li>
-        <span className="rp-legend__swatch" style={{ background: BAR }} />
-        Cognitive load (multiple of baseline)
-      </li>
-      {anyFlag && (
-        <li>
-          <span className="rp-legend__swatch" style={{ background: FLAG }} />
-          Flagged: wrong without effort
-        </li>
-      )}
-      <li>
-        <span className="rp-legend__line" style={{ background: LINE }} />
-        Task difficulty level
-      </li>
-      <li>
-        <span className="rp-legend__dash" />
-        Target effort band ({bandLo.toFixed(1)} to {bandHi.toFixed(1)})
-      </li>
-    </ul>
-  );
-
-  const chartSub =
-    'Bars: load per task, multiple of resting baseline. Line: difficulty level, labelled at each point.';
+  // One caption line instead of a legend row (the sketch has neither); the
+  // axes name themselves now, so only the line and the flag need words.
+  const chartSub = `Line: difficulty level.${
+    anyFlag ? ' Amber bar: flagged, wrong without effort.' : ''
+  }`;
 
   return (
     <div className="rp-report">
@@ -428,7 +402,6 @@ export default function ReportScreen({ sessionId, onNewSession, demo = false }) 
           exportName={`kaira_${report.patient_ref}_load.png`}
         >
           {chartBody(false)}
-          {legend}
         </ChartCard>
       </div>
 
@@ -509,7 +482,6 @@ export default function ReportScreen({ sessionId, onNewSession, demo = false }) 
             <h2 className="rp-card__title">Load and difficulty, task by task</h2>
             <p className="rp-card__sub">{chartSub}</p>
             {chartBody(true)}
-            {legend}
             <p className="rp-disclaimer">{DISCLAIMER}</p>
           </div>
         </div>

@@ -150,45 +150,6 @@
   font-family: var(--font-sans);
 }
 
-/* Hand-rolled legend (house rule: never the recharts one). */
-.rp-legend {
-  list-style: none;
-  margin: 0.9rem 0 0;
-  padding: 0;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.6rem 1.4rem;
-}
-
-.rp-legend li {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-size: 0.85rem;
-  color: #334155;
-}
-
-.rp-legend__swatch {
-  width: 11px;
-  height: 11px;
-  border-radius: 3px;
-  flex-shrink: 0;
-}
-
-.rp-legend__line {
-  width: 18px;
-  height: 3px;
-  border-radius: 2px;
-  flex-shrink: 0;
-}
-
-/* The band is drawn as dashed threshold lines; the swatch matches. */
-.rp-legend__dash {
-  width: 18px;
-  border-top: 2px dashed #cbd5e1;
-  flex-shrink: 0;
-}
-
 /* ---- Task table ------------------------------------------------------------------ */
 
 .rp-tablecard {
