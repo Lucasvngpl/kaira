@@ -258,15 +258,17 @@ export default function ReportScreen({ sessionId, onNewSession }) {
             (a ReferenceArea on a category axis stops at the category centres). */}
         <ReferenceLine yAxisId="load" y={bandLo} stroke={BAND_LINE} strokeDasharray="6 4" />
         <ReferenceLine yAxisId="load" y={bandHi} stroke={BAND_LINE} strokeDasharray="6 4" />
-        {/* No entry animation on the bars: recharts' first-mount bar animation
-            races the container measure and can leave the rects unpainted (the
-            labels still show). The line draw below is the reveal moment. */}
+        {/* Entry animation only in the expand modal (big): there the layout is
+            stable and the grow/draw reveal plays reliably, house-style. On the
+            report's first mount the same animation races the container measure
+            and can leave bars unpainted and the line dash-hidden, so inline
+            renders static. */}
         <Bar
           yAxisId="load"
           dataKey="load"
           radius={[6, 6, 0, 0]}
           maxBarSize={big ? 72 : 44}
-          isAnimationActive={false}
+          isAnimationActive={big}
         >
           {tasks.map((t) => (
             <Cell key={t.n} fill={t.flag ? FLAG : BAR} />
@@ -278,9 +280,6 @@ export default function ReportScreen({ sessionId, onNewSession }) {
             style={{ fontSize: 12, fontWeight: 700, fill: '#0f172a' }}
           />
         </Bar>
-        {/* Animation off here too: the entry draw has the same first-mount
-            race as the bars, and a stuck draw leaves the path dash-hidden
-            with its labels waiting forever. */}
         <Line
           yAxisId="level"
           type="linear"
@@ -288,7 +287,7 @@ export default function ReportScreen({ sessionId, onNewSession }) {
           stroke={LINE}
           strokeWidth={2.5}
           dot={{ r: 4, fill: '#ffffff', stroke: LINE, strokeWidth: 2 }}
-          isAnimationActive={false}
+          isAnimationActive={big}
         >
           <LabelList
             dataKey="level"
