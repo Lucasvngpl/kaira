@@ -68,7 +68,7 @@ GET  /session/{id}/baseline-status -> {done, progress}
 GET  /session/{id}/next-task       -> {task_id, level, prompt, answer, n, total_max}
 POST /session/{id}/answer          {task_id, result, elapsed_seconds} -> {action, next_level, load, converged, reason}
 GET  /session/{id}/report          -> report object (see HANDOFF.md section 7)
-GET  /session/{id}/live-load       -> {load, trusted}   polled ~1 Hz
+GET  /session/{id}/live-load       -> {load, trusted}   polled at 4 Hz by the UI
 ```
 
 Sessions live in process memory; restarting the API forgets them.

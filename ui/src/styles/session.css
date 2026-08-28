@@ -194,6 +194,49 @@
   color: var(--text-tertiary);
 }
 
+/* Warm-up placeholder: same slot height as the numeral so nothing jumps
+   when the number appears. */
+.sn-load__warmup {
+  min-height: 2.42rem;
+  display: flex;
+  align-items: center;
+  font-size: 1rem;
+  color: var(--text-tertiary);
+}
+
+/* ---- Live sparkline ---------------------------------------------------------- */
+
+/* The last ~30 s of relative load. Secondary to the numeral on purpose:
+   the clinician needs a value, the shape is corroboration. */
+.sn-spark {
+  width: 100%;
+  height: 64px;
+  display: block;
+  margin-top: 4px;
+}
+
+.sn-spark--paused {
+  opacity: 0.45;
+}
+
+.sn-spark__band {
+  /* Faint on purpose: at 64px tall the band covers most of the widget, and
+     a heavier fill reads as a grey box with a line lost inside it. */
+  fill: rgba(148, 163, 184, 0.08);
+}
+
+.sn-spark__line {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 1.5;
+}
+
+/* Rejected (untrusted) windows: the line gaps and a grey dot marks the
+   sample, so the artifact gate is visible instead of interpolated away. */
+.sn-spark__reject {
+  fill: #cbd5e1;
+}
+
 /* Live badge: recording-style pulse while a task is running. The ring radiates
    from a solid dot; colour feedback stays, motion drops, under reduced motion. */
 .sn-load__live {

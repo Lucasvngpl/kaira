@@ -20,12 +20,72 @@ const ACTION_COPY = {
 
 const RESULT_COPY = { correct: 'Marked right', incorrect: 'Marked wrong', timeout: 'Marked timeout' };
 
-export default function RunScreen({ session, onFinished }) {
+// Live-load sampling: 4 Hz (matches the real pipeline's 250 ms window step),
+// keeping a rolling ~30 s window. The first 2 s of a task show a warm-up
+// state instead of a number: a real instrument settles before it reads.
+const POLL_MS = 250;
+const SPARK_CAP = 120; // 30 s at 4 Hz
+const WARMUP_S = 2;
+
+// Hand-authored SVG sparkline (house rule: recharts is for report charts,
+// everything live is hand-drawn). Untrusted windows break the line and drop
+// a grey dot instead of silently interpolating: the gap IS the quality gate,
+// visible. No smoothing on purpose: real load estimates jitter, and jitter
+// reads as live.
+function LoadSparkline({ samples, band, paused }) {
+  const W = 260;
+  const H = 64;
+  const yMax = Math.max(band[1] * 1.2, ...samples.map((s) => s.load * 1.1), 1);
+  const y = (v) => H - (v / yMax) * H;
+  const x = (i) => (i / (SPARK_CAP - 1)) * W;
+
+  const segments = [];
+  const rejects = [];
+  let current = [];
+  samples.forEach((s, i) => {
+    if (s.trusted) {
+      current.push(`${x(i).toFixed(1)},${y(s.load).toFixed(1)}`);
+    } else {
+      if (current.length) segments.push(current);
+      current = [];
+      rejects.push({ i, load: s.load });
+    }
+  });
+  if (current.length) segments.push(current);
+
+  return (
+    <svg
+      className={`sn-spark${paused ? ' sn-spark--paused' : ''}`}
+      viewBox={`0 0 ${W} ${H}`}
+      preserveAspectRatio="none"
+      aria-hidden="true"
+    >
+      <rect
+        className="sn-spark__band"
+        x="0"
+        y={y(band[1])}
+        width={W}
+        height={Math.max(0, y(band[0]) - y(band[1]))}
+      />
+      {segments.map((pts, k) => (
+        <polyline key={k} className="sn-spark__line" points={pts.join(' ')} vectorEffect="non-scaling-stroke" />
+      ))}
+      {rejects.map((r) => (
+        <circle key={r.i} className="sn-spark__reject" cx={x(r.i)} cy={y(r.load)} r="1.8" />
+      ))}
+    </svg>
+  );
+}
+
+export default function RunScreen({ session, band = [0.8, 3.0], onFinished }) {
+  // band prop comes from GET /; the literal is only a render fallback while
+  // that first fetch is in flight.
   const [task, setTask] = useState(null);
   const [stage, setStage] = useState('reading'); // reading | running | submitted
   const [outcome, setOutcome] = useState(null); // answer response, shown between tasks
   const [lastResult, setLastResult] = useState('');
-  const [live, setLive] = useState(null); // {load, trusted}
+  const [live, setLive] = useState(null); // {load, trusted}, most recent sample
+  const [samples, setSamples] = useState([]); // rolling window for the sparkline
   const [elapsed, setElapsed] = useState(0);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -61,18 +121,21 @@ export default function RunScreen({ session, onFinished }) {
   usePoll(
     async () => {
       try {
-        setLive(await getLiveLoad(session.id));
+        const sample = await getLiveLoad(session.id);
+        setLive(sample);
+        setSamples((prev) => [...prev, sample].slice(-SPARK_CAP));
       } catch {
         // Keep the last good reading; the next poll catches up.
       }
     },
-    1000,
+    POLL_MS,
     stage === 'running'
   );
 
   const start = () => {
     t0Ref.current = Date.now();
     setElapsed(0);
+    setSamples([]); // the sparkline shows THIS task's read, not the last one's
     setStage('running');
   };
 
@@ -217,14 +280,17 @@ export default function RunScreen({ session, onFinished }) {
             <h2 className="kr-cardtitle">Cognitive load</h2>
             {/* While the stopwatch runs this number IS the EEG doing
                 something; the pulse says "live measurement", not decoration. */}
-            {stage === 'running' && <span className="sn-load__live">Measuring</span>}
+            {stage === 'running' && <span className="sn-load__live">Live</span>}
           </div>
           <div className="sn-load__body">
-            {live ? (
+            {stage === 'running' && elapsed < WARMUP_S ? (
+              // No window yet: a real instrument settles before it reads.
+              <span className="sn-load__warmup">Measuring&hellip;</span>
+            ) : live ? (
               <>
-                {/* 1 Hz updates: no count-up, no transitions - a measurement
+                {/* 4 Hz updates: no count-up, no transitions - a measurement
                     should tick, not glide. aria-live stays off; announcing a
-                    number every second is screen-reader noise. */}
+                    number four times a second is screen-reader noise. */}
                 <span
                   className={`sn-load__value${stage === 'running' ? '' : ' sn-load__value--paused'}`}
                 >
@@ -240,6 +306,9 @@ export default function RunScreen({ session, onFinished }) {
               </>
             ) : (
               <p className="kr-hint">Updates once the task starts.</p>
+            )}
+            {samples.length > 1 && (
+              <LoadSparkline samples={samples} band={band} paused={stage !== 'running'} />
             )}
             <p className="sn-load__explain">
               How hard the brain is working right now, relative to this patient's own resting

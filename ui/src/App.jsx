@@ -76,7 +76,7 @@ export default function App() {
         />
       )}
       {phase === 'run' && (
-        <RunScreen session={session} onFinished={() => setPhase('report')} />
+        <RunScreen session={session} band={info?.band} onFinished={() => setPhase('report')} />
       )}
       {phase === 'report' && <ReportScreen sessionId={session.id} onNewSession={startOver} />}
     </div>
