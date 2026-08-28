@@ -28,8 +28,11 @@ import '../styles/report.css';
 const BAR = '#7bb095';
 const FLAG = '#f59e0b';
 const LINE = '#237a4e';
-const TICK = '#64748b';
-const AXIS = '#c8ccd8'; // drawn axis lines, hairline slate like the sketch's pen strokes
+// Axis text and lines in clean ink (DM Sans comes from the page cascade
+// plus the .rp-report .recharts-text rule): the sketch is a black pen
+// drawing, not a grey one.
+const TICK = '#0a1729';
+const AXIS = '#0a1729';
 
 const RESULT_PILL = {
   correct: ['kr-pill--good', 'Right'],
@@ -51,6 +54,14 @@ const KIND_COPY = {
   digit_span: 'Digit span',
   digit_span_backward: 'Digit span, reverse',
   paired_associates: 'Paired associates',
+};
+
+// mem_l3_001 -> "Item 1": the clinician cares which stimulus from the level's
+// bank was used (repeat visits, practice effects), not our file coordinates.
+// The raw id still travels in the report JSON for engineers.
+const taskItem = (id) => {
+  const m = /_l\d+_(\d+)$/.exec(id);
+  return m ? `Item ${parseInt(m[1], 10)}` : id;
 };
 
 // One sentence, two homes: the report foot and the expand modal, so the
@@ -442,7 +453,7 @@ export default function ReportScreen({ sessionId, onNewSession, demo = false }) 
                     <td data-label="Task">
                       <span className="rp-response">
                         {KIND_COPY[t.kind] || t.task_id}
-                        <span className="rp-taskid">{t.task_id}</span>
+                        <span className="rp-taskid">{taskItem(t.task_id)}</span>
                       </span>
                     </td>
                     <td data-label="Level">{t.level}</td>
