@@ -1,0 +1,241 @@
+/* The session flow surface: start form, baseline recording, clinician run
+   screen. One file for the whole pre-report flow (house rule: a page's
+   stylesheet holds all its children's classes). */
+
+/* ---- Start ----------------------------------------------------------------- */
+
+.sn-start__card {
+  max-width: 440px;
+  padding: 24px 22px;
+  gap: 18px;
+}
+
+/* ---- Baseline --------------------------------------------------------------- */
+
+.sn-baseline {
+  display: flex;
+  justify-content: center;
+  padding-top: 8vh;
+}
+
+.sn-baseline__card {
+  width: min(520px, 100%);
+  padding: 28px 26px;
+  align-items: flex-start;
+}
+
+.sn-baseline__title {
+  font-family: var(--font-serif);
+  font-size: 1.35rem;
+  font-weight: 600;
+  margin: 0 0 6px;
+  color: var(--ink);
+}
+
+.sn-baseline__sub {
+  font-size: 0.95rem;
+  color: var(--text-secondary);
+  margin: 0 0 20px;
+}
+
+.sn-progress {
+  width: 100%;
+  height: 9px;
+  background: #f1f5f9;
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.sn-progress__fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--accent);
+  /* Polls land once a second; easing between them keeps the bar from
+     visibly stepping. This tracks real samples, it is not a fake delay. */
+  transition: width 0.6s ease;
+}
+
+.sn-baseline__count {
+  margin: 10px 0 0;
+  font-size: 13px;
+  color: var(--text-tertiary);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- Run screen ------------------------------------------------------------- */
+
+.sn-run__grid {
+  display: grid;
+  /* Task card dominates; the load readout is a sidecar, not a co-star. */
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: 18px;
+  align-items: start;
+}
+
+@media (max-width: 900px) {
+  .sn-run__grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.sn-task {
+  padding: 6px 18px 4px;
+}
+
+.sn-task__prompt {
+  font-size: 17px;
+  line-height: 1.55;
+  color: var(--ink);
+  margin: 0 0 16px;
+  text-wrap: pretty;
+}
+
+/* Nested card inside a card: hairline only, no shadow (house rule). */
+.sn-answer {
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-md);
+  background: var(--bg-subtle);
+  padding: 12px 14px;
+}
+
+.sn-answer__label {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+  margin-bottom: 4px;
+}
+
+.sn-answer__text {
+  margin: 0;
+  font-size: 15px;
+  color: var(--ink);
+}
+
+.sn-controls {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 14px;
+  padding: 16px 18px 20px;
+}
+
+.sn-stopwatch {
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+  min-width: 92px; /* widest plausible reading, so the verdicts never shift */
+}
+
+.sn-verdicts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* Wrong / Timeout are outlined with status-coloured content: a verdict is a
+   fact being recorded, not a danger action, so no filled red buttons. */
+.sn-verdict--bad {
+  color: var(--status-bad);
+}
+
+.sn-verdict--warn {
+  color: var(--status-warn);
+}
+
+.sn-outcome {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.sn-outcome__headline {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.sn-outcome__reason {
+  margin: 0 0 8px;
+  font-size: 13px;
+  color: var(--text-tertiary);
+}
+
+.sn-run__error {
+  padding: 0 18px 18px;
+}
+
+/* ---- Live load card ---------------------------------------------------------- */
+
+.sn-load__body {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 4px 18px 18px;
+}
+
+.sn-load__value {
+  font-size: 2.3rem;
+  font-weight: 700;
+  line-height: 1.05;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.sn-load__unit {
+  margin-left: 6px;
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: var(--text-tertiary);
+}
+
+.sn-load__explain {
+  margin: 4px 0 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--text-tertiary);
+  text-wrap: pretty;
+}
+
+/* ---- Task skeleton ------------------------------------------------------------ */
+
+.sn-skel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 22px 18px 26px;
+}
+
+.sn-skel__bar {
+  height: 14px;
+  border-radius: 7px;
+  background: linear-gradient(100deg, #f1f5f9 30%, #f8fafc 50%, #f1f5f9 70%);
+  background-size: 200% 100%;
+  animation: sn-shimmer 1.3s ease-in-out infinite;
+}
+
+@keyframes sn-shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sn-skel__bar {
+    animation: none;
+  }
+
+  .sn-progress__fill {
+    transition: none;
+  }
+}

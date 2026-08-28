@@ -1,0 +1,390 @@
+/* Report surface: header, KPI row, the signature chart card (with expand
+   modal), and the task-by-task table. */
+
+.rp-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.rp-flagnote {
+  margin: 0 0 1.25rem;
+  /* Chips are inline-flex; as a callout this one is a block-level sentence. */
+  display: inline-flex;
+  max-width: 100%;
+  white-space: normal;
+  line-height: 1.45;
+}
+
+/* ---- KPI row ----------------------------------------------------------------- */
+
+.rp-kpis {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+@media (max-width: 900px) {
+  .rp-kpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 560px) {
+  .rp-kpis {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.rp-kpi {
+  padding: 16px 18px 14px;
+  gap: 6px;
+}
+
+.rp-kpi__labelrow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.rp-kpi__label {
+  font-size: 0.86rem;
+  color: var(--text-secondary);
+}
+
+/* Numbers stay neutral ink; colour lives in pills and chips only. */
+.rp-kpi__value {
+  font-size: 2rem;
+  font-weight: 700;
+  line-height: 1.05;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.rp-kpi__sub {
+  font-size: 12.5px;
+  color: var(--text-tertiary);
+  text-wrap: balance;
+}
+
+/* ---- Chart card ---------------------------------------------------------------- */
+
+.rp-card {
+  position: relative; /* anchors the hover-reveal expand control */
+  padding: 1.3rem 1.4rem;
+  margin-bottom: 18px;
+}
+
+.rp-card__title {
+  font-family: var(--font-serif);
+  font-size: 1.15rem;
+  font-weight: 600;
+  color: #0f172a;
+  margin: 0 0 0.15rem;
+}
+
+.rp-card__sub {
+  font-size: 0.85rem;
+  color: var(--status-idle);
+  margin: 0 0 1rem;
+}
+
+/* Hover-reveal expand, top-right (house pattern). */
+.rp-card__expand {
+  position: absolute;
+  top: 0.9rem;
+  right: 0.9rem;
+  width: 30px;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border-soft);
+  border-radius: 8px;
+  background: #ffffff;
+  color: #64748b;
+  cursor: pointer;
+  opacity: 0;
+  transform: translateY(-2px);
+  pointer-events: none;
+  transition: opacity 0.18s ease, transform 0.18s ease, color 0.15s, border-color 0.15s,
+    background 0.15s;
+}
+
+.rp-card:hover .rp-card__expand,
+.rp-card__expand:focus-visible {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+.rp-card__expand:hover {
+  background: #f4f5f8;
+  color: #0f172a;
+  border-color: #cbd5e1;
+}
+
+.rp-card__expand svg {
+  width: 15px;
+  height: 15px;
+}
+
+.rp-report .recharts-text {
+  font-family: var(--font-sans);
+}
+
+/* Hand-rolled legend (house rule: never the recharts one). */
+.rp-legend {
+  list-style: none;
+  margin: 0.9rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem 1.4rem;
+}
+
+.rp-legend li {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  color: #334155;
+}
+
+.rp-legend__swatch {
+  width: 11px;
+  height: 11px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+.rp-legend__swatch--band {
+  background: rgba(148, 163, 184, 0.25);
+  border: 1px solid var(--border-soft);
+}
+
+.rp-legend__line {
+  width: 18px;
+  height: 3px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+/* ---- Task table ------------------------------------------------------------------ */
+
+.rp-tablecard {
+  /* One border colour for the whole table: card edge, header underline and
+     row separators all read --hairline. */
+  border-color: var(--hairline);
+}
+
+.rp-tablewrap {
+  overflow-x: auto;
+}
+
+.rp-table {
+  width: 100%;
+  min-width: 760px;
+  border-collapse: collapse;
+}
+
+.rp-table thead th {
+  background: #ffffff;
+  padding: 0.85rem 1rem;
+  text-align: left;
+  font-size: 12px;
+  font-weight: 500;
+  color: #6b7280;
+  letter-spacing: 0.01em;
+  border-bottom: 1px solid var(--hairline);
+  white-space: nowrap;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.rp-table td {
+  padding: 0.95rem 1rem;
+  border-bottom: 1px solid var(--hairline);
+  vertical-align: middle;
+  text-align: left;
+  font-size: 0.92rem;
+  color: #1f2937;
+}
+
+.rp-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+/* Flagged rows carry a faint amber wash; the chip says why. */
+.rp-row--flag td {
+  background: rgba(245, 158, 11, 0.06);
+}
+
+.rp-flagchip {
+  margin-left: 8px;
+}
+
+.rp-taskid {
+  font-size: 0.82rem;
+  color: var(--text-tertiary);
+  font-variant-numeric: tabular-nums;
+}
+
+.rp-num {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.rp-response {
+  display: block;
+}
+
+.rp-reason {
+  display: block;
+  font-size: 12px;
+  color: var(--text-tertiary);
+  margin-top: 2px;
+}
+
+/* Mobile: the table becomes labelled cards (house data-label pattern). */
+@media (max-width: 720px) {
+  .rp-table {
+    min-width: 0;
+  }
+
+  .rp-table thead {
+    display: none;
+  }
+
+  .rp-table tr {
+    display: block;
+    padding: 0.6rem 0;
+    border-bottom: 1px solid var(--hairline);
+  }
+
+  .rp-table tbody tr:last-child {
+    border-bottom: none;
+  }
+
+  .rp-table td {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    border-bottom: none;
+    padding: 0.35rem 1rem;
+  }
+
+  .rp-table td::before {
+    content: attr(data-label);
+    font-size: 12px;
+    color: #6b7280;
+  }
+
+  /* Card layout puts the label left and the value right; the two-line
+     response block follows that alignment. */
+  .rp-response {
+    text-align: right;
+  }
+}
+
+/* ---- Expand modal ------------------------------------------------------------------ */
+
+.rp-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 3000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  background: rgba(15, 23, 42, 0.45);
+  animation: rp-modal-in 0.16s ease;
+}
+
+@keyframes rp-modal-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.rp-modal__panel {
+  position: relative;
+  width: min(960px, 94vw);
+  max-height: 90dvh;
+  overflow: auto;
+  background: #ffffff;
+  border-radius: var(--radius-lg); /* modals 16px, cards 12px */
+  padding: 1.6rem 1.8rem 1.8rem;
+  box-shadow: 0 20px 60px rgba(10, 23, 41, 0.28); /* floating layers own their big shadow */
+}
+
+.rp-modal__close {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  width: 34px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border-soft);
+  border-radius: 9px;
+  background: #ffffff;
+  color: #64748b;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+}
+
+.rp-modal__close:hover {
+  background: #f4f5f8;
+  color: #0f172a;
+  border-color: #cbd5e1;
+}
+
+.rp-modal__close svg {
+  width: 18px;
+  height: 18px;
+}
+
+/* ---- Loading skeletons -------------------------------------------------------------- */
+
+.rp-skel {
+  min-height: 104px;
+  box-shadow: none;
+  border-color: #eef1f5;
+  background: linear-gradient(100deg, #f1f5f9 30%, #f8fafc 50%, #f1f5f9 70%);
+  background-size: 200% 100%;
+  animation: rp-shimmer 1.3s ease-in-out infinite;
+}
+
+.rp-skel--tall {
+  min-height: 360px;
+}
+
+@keyframes rp-shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rp-modal {
+    animation: none;
+  }
+
+  .rp-skel {
+    animation: none;
+  }
+}

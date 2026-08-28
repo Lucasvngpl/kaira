@@ -1,0 +1,387 @@
+/* App shell and the shared chrome every screen reads: card, buttons, pills,
+   fields, header. Screen-specific classes live in run.css / report.css
+   (house rule: one stylesheet per surface, all its children's classes in it). */
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg-page);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ---- Page shell ----------------------------------------------------------- */
+
+.kr-page {
+  text-align: left;
+  max-width: 1180px;
+  margin: 0 auto;
+  min-height: 100dvh; /* dvh, not vh - iOS Safari */
+  padding: 0 40px 56px;
+}
+
+.kr-page button,
+.kr-page input,
+.kr-page select,
+.kr-page textarea {
+  font-family: inherit; /* form controls do not inherit font-family on their own */
+}
+
+@media (max-width: 760px) {
+  .kr-page {
+    padding: 0 16px 40px;
+  }
+}
+
+/* ---- Top bar: wordmark left, session facts right -------------------------- */
+
+.kr-topbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 18px 0 26px;
+}
+
+.kr-wordmark {
+  font-family: var(--font-serif);
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+}
+
+.kr-topbar__meta {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+/* ---- Page header: serif title + muted sub --------------------------------- */
+
+.kr-header {
+  margin-bottom: 1.75rem;
+}
+
+.kr-header h1 {
+  font-family: var(--font-serif);
+  font-size: 2.2rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+  margin: 0 0 0.4rem;
+}
+
+.kr-header p {
+  font-size: 1.02rem;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+/* ---- Card ------------------------------------------------------------------ */
+
+/* One card treatment everywhere: white, 1px hairline, 12px radius,
+   token shadow. Never a literal shadow value. */
+.kr-card {
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-card);
+  overflow: hidden;
+}
+
+.kr-card__head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 18px 18px 10px;
+}
+
+.kr-cardtitle {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--ink);
+}
+
+/* Tinted count badge - the title says what, the count says how many. */
+.kr-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: 100px;
+  background: var(--fill);
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+/* ---- Buttons ---------------------------------------------------------------- */
+
+/* Filled-tint action, 38px tall. Exactly ONE control per screen gets the
+   accent fill (--primary); which one it is may move so there is never a
+   dead primary. Press-scale is the only motion. */
+.kr-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 38px;
+  padding: 0 16px;
+  border: none;
+  border-radius: var(--radius-md);
+  background: var(--fill);
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 500;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background 0.12s, transform 0.14s var(--ease-out);
+}
+
+.kr-action:hover {
+  background: var(--fill-hover);
+}
+
+.kr-action:active {
+  transform: scale(0.97);
+}
+
+.kr-action:disabled {
+  opacity: 0.45;
+  cursor: default;
+  transform: none;
+}
+
+.kr-action svg {
+  width: 15px;
+  height: 15px;
+  flex: none;
+}
+
+.kr-action--primary {
+  background: var(--accent);
+  color: #fff;
+}
+
+.kr-action--primary:hover {
+  background: var(--accent-hover);
+}
+
+/* Outlined secondary */
+.kr-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 8px 16px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-soft);
+  background: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  color: #334155;
+  cursor: pointer;
+  text-decoration: none;
+  transition: background 0.12s, border-color 0.12s, transform 0.14s var(--ease-out);
+}
+
+.kr-btn:hover {
+  background: #f8fafc;
+  border-color: var(--border-strong);
+}
+
+.kr-btn:active {
+  transform: scale(0.97);
+}
+
+.kr-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+  transform: none;
+}
+
+.kr-btn svg {
+  width: 13px;
+  height: 13px;
+}
+
+/* ---- Status pill: white fill, hairline, coloured dot ------------------------ */
+
+.kr-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 11px 4px;
+  border-radius: 999px;
+  background: #fff;
+  color: #475569;
+  border: 1px solid #e1e1e1;
+  font-size: 0.75rem;
+  font-weight: 500;
+  line-height: 1.3;
+  white-space: nowrap;
+}
+
+.kr-pill::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--pill-dot, var(--status-idle));
+  flex: 0 0 8px;
+}
+
+.kr-pill--good {
+  --pill-dot: var(--status-good);
+}
+
+.kr-pill--warn {
+  --pill-dot: var(--status-warn);
+}
+
+.kr-pill--bad {
+  --pill-dot: var(--status-bad);
+}
+
+.kr-pill--idle {
+  --pill-dot: var(--status-idle);
+}
+
+/* Soft-fill chip (no border) for live/system states, e.g. "Synthetic signal". */
+.kr-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 11px 4px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.5;
+  white-space: nowrap;
+  background: var(--accent-soft);
+  color: #475569;
+}
+
+.kr-chip::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--chip-dot, var(--accent));
+  flex: 0 0 8px;
+}
+
+.kr-chip--warn {
+  background: #fdf1e3;
+  --chip-dot: var(--status-warn);
+}
+
+/* ---- Form fields ------------------------------------------------------------ */
+
+.kr-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.kr-field label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.kr-field input,
+.kr-field select {
+  min-height: 40px;
+  padding: 0 12px;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-field);
+  background: #fff;
+  font-size: 14px;
+  color: var(--ink);
+  transition: border-color 0.12s;
+}
+
+.kr-field input:focus,
+.kr-field select:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.kr-field select:disabled {
+  color: var(--text-tertiary);
+  background: var(--bg-subtle);
+}
+
+/* ---- Error / hint ----------------------------------------------------------- */
+
+.kr-error {
+  color: var(--status-bad);
+  font-size: 0.9rem;
+  margin: 0.75rem 0 0;
+}
+
+.kr-hint {
+  font-size: 13px;
+  color: var(--text-tertiary);
+  margin: 0;
+}
+
+/* ---- Mount reveal ----------------------------------------------------------- */
+
+/* Screens are state-swapped, not routed, so entry animation runs on mount
+   (the scroll-observer variant is pointless when everything starts in view).
+   Same fade-up grammar as the house drawer/modal entries. */
+.kr-reveal {
+  animation: kr-reveal-in 0.35s var(--ease-out) both;
+}
+
+.kr-reveal--2 {
+  animation-delay: 0.06s;
+}
+
+.kr-reveal--3 {
+  animation-delay: 0.12s;
+}
+
+.kr-reveal--4 {
+  animation-delay: 0.18s;
+}
+
+@keyframes kr-reveal-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* House rule: keep the colour feedback, drop the movement. */
+@media (prefers-reduced-motion: reduce) {
+  .kr-reveal {
+    animation: none;
+  }
+
+  .kr-action,
+  .kr-btn {
+    transition: background 0.12s, border-color 0.12s;
+  }
+
+  .kr-action:active,
+  .kr-btn:active {
+    transform: none;
+  }
+}

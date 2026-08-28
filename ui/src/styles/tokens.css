@@ -1,0 +1,54 @@
+/* Design tokens, carried over from the UQwest staff surface (tokens.css there).
+   Kaira is a clinician-facing tool, so it takes the STAFF accent (green), not
+   the student blue. Values are verbatim UQwest unless commented. */
+:root {
+  /* --- Accent ---------------------------------------------------------- */
+  --accent: #237a4e;
+  --accent-rgb: 35, 122, 78;
+  --accent-hover: #1b5e3b;
+  --accent-soft: #e4f2ea;
+  --accent-border: #bfe0cc;
+
+  /* --- Ink / text ------------------------------------------------------ */
+  --ink: #0a1729;
+  --text-secondary: #5c6378;
+  --text-tertiary: #8a8fa3;
+
+  /* --- Borders / surfaces ---------------------------------------------- */
+  --border-soft: #e5e7ee;
+  --border-strong: #c8ccd8;
+  --hairline: #f1f1f1; /* table edges + row separators, one colour for all three */
+  --bg-page: #ffffff;
+  --bg-subtle: #fafafb;
+  --fill: #f1f1f1;
+  --fill-hover: #e8e8e8;
+
+  /* --- Status (never re-themed; a result must always read the same) ---- */
+  --status-good: #16a34a;
+  --status-warn: #d97706;
+  --status-bad: #dc2626;
+  --status-idle: #94a3b8;
+
+  /* --- Chart ------------------------------------------------------------
+     Load bars are a MEASUREMENT, not a status, so they get a cool neutral
+     blue from the UQwest spectrum. Flagged bars go amber (caution, not
+     error). The level line takes the accent, per the house trend-line rule. */
+  --chart-bar: #3b82f6;
+  --chart-flag: #f59e0b;
+  --chart-line: var(--accent);
+  --chart-grid: #e6e9ee;
+  --chart-tick: #64748b;
+
+  /* --- Typography ------------------------------------------------------ */
+  --font-serif: 'Source Serif 4', Georgia, 'Times New Roman', serif;
+  --font-sans: 'DM Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+
+  /* --- Radius / shadow -------------------------------------------------- */
+  --radius-field: 10px;
+  --radius-md: 12px; /* cards, pills, buttons - THE radius */
+  --radius-lg: 16px; /* modals */
+  --shadow-card: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+
+  /* Strong ease-out for press feedback (built-in easings are too weak). */
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+}
