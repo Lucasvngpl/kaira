@@ -19,6 +19,7 @@ import {
 } from 'recharts';
 import { getReport, errorText } from '../api.js';
 import { reasonCopy } from '../reasons.js';
+import { SAMPLE_REPORT } from '../sampleReport.js';
 import '../styles/report.css';
 
 // Chart colours are JS-side constants (recharts props take literals); values
@@ -45,6 +46,12 @@ const ACTION_COPY = {
   ease: 'Eased difficulty',
   flag: 'Flagged disengagement',
 };
+
+// One sentence, two homes: the report foot and the expand modal, so the
+// screenshot-able artifact carries the non-diagnostic framing with it.
+const DISCLAIMER =
+  "Load is measured against this patient's own resting baseline. Values are not comparable " +
+  'between patients, and this report is a measurement, not a diagnostic output.';
 
 // House count-up: rAF + ease-out cubic, painting via a ref instead of state
 // so 90 frames do not mean 90 re-renders. The real value is the initial DOM
@@ -173,16 +180,20 @@ function ChartCard({ title, sub, onExpand, exportName, children }) {
   );
 }
 
-export default function ReportScreen({ sessionId, onNewSession }) {
+export default function ReportScreen({ sessionId, onNewSession, demo = false }) {
   const [report, setReport] = useState(null);
   const [error, setError] = useState('');
   const [expanded, setExpanded] = useState(false);
 
   useEffect(() => {
+    if (demo) {
+      setReport(SAMPLE_REPORT); // ?demo=report: fabricated PT-SAMPLE data, no session behind it
+      return;
+    }
     getReport(sessionId)
       .then(setReport)
       .catch((e) => setError(errorText(e)));
-  }, [sessionId]);
+  }, [sessionId, demo]);
 
   // Close the expand modal on Escape and lock background scroll while open.
   useEffect(() => {
@@ -230,6 +241,14 @@ export default function ReportScreen({ sessionId, onNewSession }) {
   const anyFlag = tasks.some((t) => t.flag);
   const [bandLo, bandHi] = report.band;
 
+  // Y-scale: data-driven with a floor that keeps the band's top line inside
+  // the plot (the band is the convergence criterion; hiding it would be
+  // worse than headroom). Rounded up to a half, ticks at whole numbers only,
+  // so flat placeholder data wastes at most the band's own headroom.
+  const maxLoad = Math.max(...tasks.map((t) => t.load), 0);
+  const loadTop = Math.max(Math.ceil(Math.max(maxLoad * 1.15, bandHi * 1.05) * 2) / 2, 1);
+  const loadTicks = Array.from({ length: Math.floor(loadTop) + 1 }, (_, i) => i);
+
   const chartBody = (big) => (
     <ResponsiveContainer width="100%" height={big ? 460 : 280}>
       <ComposedChart data={tasks} margin={{ top: 24, right: 8, left: 8, bottom: 0 }}>
@@ -248,16 +267,28 @@ export default function ReportScreen({ sessionId, onNewSession }) {
           axisLine={false}
           tickLine={false}
           width={40}
-          // Integer ceiling: a fractional top (3.3000000000000003) leaks float
-          // noise into the tick labels. Always tall enough to show the band.
-          domain={[0, (dataMax) => Math.ceil(Math.max(dataMax * 1.15, bandHi * 1.1))]}
+          domain={[0, loadTop]}
+          ticks={loadTicks}
           tick={{ fontSize: 12, fill: TICK }}
         />
         <YAxis yAxisId="level" hide domain={[0.5, report.level_max + 0.5]} />
         {/* Effort thresholds, not a data region: full-width dashed lines
-            (a ReferenceArea on a category axis stops at the category centres). */}
-        <ReferenceLine yAxisId="load" y={bandLo} stroke={BAND_LINE} strokeDasharray="6 4" />
-        <ReferenceLine yAxisId="load" y={bandHi} stroke={BAND_LINE} strokeDasharray="6 4" />
+            (a ReferenceArea on a category axis stops at the category centres).
+            Each line names its value; the legend only says the band exists. */}
+        <ReferenceLine
+          yAxisId="load"
+          y={bandLo}
+          stroke={BAND_LINE}
+          strokeDasharray="6 4"
+          label={{ value: bandLo.toFixed(1), position: 'insideRight', fill: TICK, fontSize: 11, dy: -7 }}
+        />
+        <ReferenceLine
+          yAxisId="load"
+          y={bandHi}
+          stroke={BAND_LINE}
+          strokeDasharray="6 4"
+          label={{ value: bandHi.toFixed(1), position: 'insideRight', fill: TICK, fontSize: 11, dy: -7 }}
+        />
         {/* Entry animation only in the expand modal (big): there the layout is
             stable and the grow/draw reveal plays reliably, house-style. On the
             report's first mount the same animation races the container measure
@@ -273,11 +304,13 @@ export default function ReportScreen({ sessionId, onNewSession }) {
           {tasks.map((t) => (
             <Cell key={t.n} fill={t.flag ? FLAG : BAR} />
           ))}
+          {/* Inside the bar top, not above it: above-the-bar shared an anchor
+              with the level labels and the two collided on flat data. */}
           <LabelList
             dataKey="load"
-            position="top"
+            position="insideTop"
             formatter={(v) => v.toFixed(2)}
-            style={{ fontSize: 12, fontWeight: 700, fill: '#0f172a' }}
+            style={{ fontSize: 11, fontWeight: 700, fill: '#0f172a' }}
           />
         </Bar>
         <Line
@@ -289,11 +322,20 @@ export default function ReportScreen({ sessionId, onNewSession }) {
           dot={{ r: 4, fill: '#ffffff', stroke: LINE, strokeWidth: 2 }}
           isAnimationActive={big}
         >
+          {/* White halo (paint-order stroke) keeps the green numeral legible
+              when a low-level dot sits on a green bar. */}
           <LabelList
             dataKey="level"
             position="top"
             offset={10}
-            style={{ fontSize: 11, fontWeight: 700, fill: LINE }}
+            style={{
+              fontSize: 11,
+              fontWeight: 700,
+              fill: LINE,
+              stroke: '#ffffff',
+              strokeWidth: 3,
+              paintOrder: 'stroke',
+            }}
           />
         </Line>
       </ComposedChart>
@@ -444,10 +486,7 @@ export default function ReportScreen({ sessionId, onNewSession }) {
 
       {/* The quiet line that answers "is this a diagnosis?" before a judge
           or clinician has to ask it. */}
-      <p className="rp-disclaimer kr-reveal kr-reveal--4">
-        Load is measured against this patient's own resting baseline. Values are not comparable
-        between patients, and this report is a measurement, not a diagnostic output.
-      </p>
+      <p className="rp-disclaimer kr-reveal kr-reveal--4">{DISCLAIMER}</p>
 
       {/* Expand modal: same chart, large. Click backdrop or Esc to close. */}
       {expanded && (
@@ -471,6 +510,7 @@ export default function ReportScreen({ sessionId, onNewSession }) {
             <p className="rp-card__sub">{chartSub}</p>
             {chartBody(true)}
             {legend}
+            <p className="rp-disclaimer">{DISCLAIMER}</p>
           </div>
         </div>
       )}

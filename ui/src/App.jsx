@@ -10,8 +10,14 @@ import BaselineScreen from './components/BaselineScreen.jsx';
 import RunScreen from './components/RunScreen.jsx';
 import ReportScreen from './components/ReportScreen.jsx';
 
+// ?demo=report deep-links straight to the report screen with sample data
+// (see sampleReport.js) - for UI work and reveal checks without running a
+// 15 s baseline plus a full session. Read once; the state machine owns the
+// rest of the navigation.
+const DEMO = new URLSearchParams(window.location.search).get('demo');
+
 export default function App() {
-  const [phase, setPhase] = useState('start'); // start | baseline | run | report
+  const [phase, setPhase] = useState(DEMO === 'report' ? 'report' : 'start'); // start | baseline | run | report
   const [session, setSession] = useState(null); // {id, baselineSeconds, patientRef, domain}
   const [info, setInfo] = useState(null); // GET / : {synthetic, domains}
   const [infoError, setInfoError] = useState('');
@@ -78,7 +84,13 @@ export default function App() {
       {phase === 'run' && (
         <RunScreen session={session} band={info?.band} onFinished={() => setPhase('report')} />
       )}
-      {phase === 'report' && <ReportScreen sessionId={session.id} onNewSession={startOver} />}
+      {phase === 'report' && (
+        <ReportScreen
+          sessionId={session?.id}
+          demo={DEMO === 'report' && !session}
+          onNewSession={startOver}
+        />
+      )}
     </div>
   );
 }

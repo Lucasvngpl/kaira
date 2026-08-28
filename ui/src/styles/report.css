@@ -308,13 +308,17 @@
   }
 }
 
-/* Non-diagnostic note: quiet, but present on every report. */
+/* Non-diagnostic note: quiet, but present on every report and in the modal. */
 .rp-disclaimer {
   margin: 4px 0 0;
   font-size: 12.5px;
   line-height: 1.5;
   color: var(--text-tertiary);
   text-wrap: pretty;
+}
+
+.rp-modal__panel .rp-disclaimer {
+  margin-top: 0.9rem;
 }
 
 /* ---- Expand modal ------------------------------------------------------------------ */
