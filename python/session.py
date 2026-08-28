@@ -48,9 +48,11 @@ SAMPLE_SECONDS = 2.0
 # Hard cap so a session that never converges still ends and reports.
 MAX_TASKS = 12
 
-# Adaptive tests start mid-scale (standard CAT practice: fastest information
-# gain when you can move either way).
-LEVEL_START = 3
+# Deliberately BELOW the CAT midpoint (3): the target population is patients
+# monitored for cognitive decline, so ability skews low - a spare trial of
+# downward headroom is worth more than symmetric information gain. A
+# high-functioning patient just spends one easy trial advancing.
+LEVEL_START = 2
 
 # The stopping rule and the effort band belong to the adaptive logic, so
 # they live in decide.py (decide.CONSECUTIVE_TO_CONVERGE, decide.LOAD_BAND).

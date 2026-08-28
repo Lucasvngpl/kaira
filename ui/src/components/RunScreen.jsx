@@ -8,13 +8,14 @@ import { useEffect, useRef, useState } from 'react';
 import { FiArrowRight, FiCheck, FiClock, FiPlay, FiX } from 'react-icons/fi';
 import { getLiveLoad, getNextTask, postAnswer, errorText, isConflict } from '../api.js';
 import usePoll from '../hooks/usePoll.js';
+import { reasonCopy } from '../reasons.js';
 import '../styles/session.css';
 
 const ACTION_COPY = {
   advance: (l) => `Raising difficulty to level ${l}`,
   hold: (l) => `Holding at level ${l}`,
   ease: (l) => `Easing to level ${l}`,
-  flag: (l) => `Wrong without effort. Holding level ${l}, flagged as possible disengagement`,
+  flag: (l) => `Flagging possible disengagement, holding level ${l}`,
 };
 
 const RESULT_COPY = { correct: 'Marked right', incorrect: 'Marked wrong', timeout: 'Marked timeout' };
@@ -179,11 +180,13 @@ export default function RunScreen({ session, onFinished }) {
 
                 {stage === 'submitted' && outcome && (
                   <div className="sn-outcome">
+                    {/* The WHY leads: the effort-gated reason is the product,
+                        so it gets the headline, not just the level movement. */}
                     <p className="sn-outcome__headline">
-                      {RESULT_COPY[lastResult]} · {ACTION_COPY[outcome.action](outcome.next_level)}
+                      {reasonCopy(outcome.reason)}. {ACTION_COPY[outcome.action](outcome.next_level)}.
                     </p>
                     <p className="sn-outcome__reason">
-                      Load {outcome.load.toFixed(2)}&times; baseline · decision: {outcome.reason}
+                      {RESULT_COPY[lastResult]} · Load {outcome.load.toFixed(2)}&times; baseline
                     </p>
                     <button className="kr-action kr-action--primary" onClick={next}>
                       Next task
@@ -212,6 +215,9 @@ export default function RunScreen({ session, onFinished }) {
         <section className="kr-card sn-load">
           <div className="kr-card__head">
             <h2 className="kr-cardtitle">Cognitive load</h2>
+            {/* While the stopwatch runs this number IS the EEG doing
+                something; the pulse says "live measurement", not decoration. */}
+            {stage === 'running' && <span className="sn-load__live">Measuring</span>}
           </div>
           <div className="sn-load__body">
             {live ? (
@@ -219,7 +225,9 @@ export default function RunScreen({ session, onFinished }) {
                 {/* 1 Hz updates: no count-up, no transitions - a measurement
                     should tick, not glide. aria-live stays off; announcing a
                     number every second is screen-reader noise. */}
-                <span className="sn-load__value">
+                <span
+                  className={`sn-load__value${stage === 'running' ? '' : ' sn-load__value--paused'}`}
+                >
                   {live.load.toFixed(2)}
                   <span className="sn-load__unit">&times; baseline</span>
                 </span>

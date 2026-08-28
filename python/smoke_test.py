@@ -32,22 +32,23 @@ def run() -> None:
     status = s.baseline_status()
     assert status["done"] and status["progress"] == 1.0
 
+    start = session_mod.LEVEL_START  # asserts track the policy constant, not a literal
     t1 = s.next_task()
-    assert t1["n"] == 1 and t1["level"] == 3 and t1["total_max"] == session_mod.MAX_TASKS
+    assert t1["n"] == 1 and t1["level"] == start and t1["total_max"] == session_mod.MAX_TASKS
     assert t1 == s.next_task(), "next_task must be idempotent until answered"
     live = s.live_load()
     assert live["trusted"] and live["load"] == 1.0, "placeholder load must be exactly baseline"
     r1 = s.submit_answer(t1["task_id"], "incorrect", 12.0)
-    assert r1["action"] == "ease" and r1["next_level"] == 2 and not r1["converged"]
+    assert r1["action"] == "ease" and r1["next_level"] == start - 1 and not r1["converged"]
 
     for expected_n in (2, 3, 4):
         t = s.next_task()
-        assert t["n"] == expected_n and t["level"] == 2
+        assert t["n"] == expected_n and t["level"] == start - 1
         r = s.submit_answer(t["task_id"], "correct", 5.0)
     assert r["converged"] and s.ended
 
     rep = s.report()
-    assert rep["final_level"] == 2
+    assert rep["final_level"] == start - 1
     assert rep["reason"] == session_mod.CONVERGED_REASON
     assert rep["accuracy"] == 0.75 and rep["disengaged_count"] == 0
     assert len(rep["tasks"]) == 4 and rep["mean_rt"] == 6.8
@@ -74,10 +75,10 @@ def run() -> None:
         s2.baseline_status()  # baseline log = 0.0, so multiples come out as exp(sample)
         quadrants = [
             # (load multiple, result, expected action, level after, flagged)
-            (0.6, "correct", "advance", 4, False),  # right without effort -> harder
-            (1.5, "correct", "hold", 4, False),  # right at useful effort -> hold
-            (2.0, "incorrect", "ease", 3, False),  # wrong while working -> easier
-            (0.5, "incorrect", "flag", 3, True),  # wrong without effort -> disengaged, hold
+            (0.6, "correct", "advance", start + 1, False),  # right without effort -> harder
+            (1.5, "correct", "hold", start + 1, False),  # right at useful effort -> hold
+            (2.0, "incorrect", "ease", start, False),  # wrong while working -> easier
+            (0.5, "incorrect", "flag", start, True),  # wrong without effort -> disengaged, hold
         ]
         for multiple, result, action, level_after, flagged in quadrants:
             current[0] = math.log(multiple)

@@ -17,6 +17,7 @@ import {
   YAxis,
 } from 'recharts';
 import { getReport, errorText } from '../api.js';
+import { reasonCopy } from '../reasons.js';
 import '../styles/report.css';
 
 // Chart colours are JS-side constants (recharts props take literals); values
@@ -358,7 +359,7 @@ export default function ReportScreen({ sessionId, onNewSession }) {
                     <td data-label="System response">
                       <span className="rp-response">
                         {ACTION_COPY[t.action] || t.action}
-                        <span className="rp-reason">{t.reason}</span>
+                        <span className="rp-reason">{reasonCopy(t.reason)}</span>
                       </span>
                     </td>
                   </tr>

@@ -189,6 +189,44 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* Between tasks the reading is stale; dim it so the live state has contrast. */
+.sn-load__value--paused {
+  color: var(--text-tertiary);
+}
+
+/* Live badge: recording-style pulse while a task is running. The ring radiates
+   from a solid dot; colour feedback stays, motion drops, under reduced motion. */
+.sn-load__live {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.sn-load__live::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--accent);
+  animation: sn-pulse 1.4s ease-out infinite;
+}
+
+@keyframes sn-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(35, 122, 78, 0.35);
+  }
+  70% {
+    box-shadow: 0 0 0 9px rgba(35, 122, 78, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(35, 122, 78, 0);
+  }
+}
+
 .sn-load__unit {
   margin-left: 6px;
   font-size: 0.95rem;
@@ -237,5 +275,9 @@
 
   .sn-progress__fill {
     transition: none;
+  }
+
+  .sn-load__live::before {
+    animation: none;
   }
 }
