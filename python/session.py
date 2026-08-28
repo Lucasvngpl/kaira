@@ -312,6 +312,7 @@ class Session:
             "patient_ref": self.patient_ref,
             "date": self.date,
             "final_level": self.final_level if self.final_level is not None else self.state.level,
+            "level_max": tasks.LEVEL_MAX,  # additive to the contract: the UI shows "Level N of MAX"
             "reason": self.end_reason or "Session in progress",
             "converged": self.converged,
             "band": list(decide.LOAD_BAND),

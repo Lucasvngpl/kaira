@@ -3,7 +3,8 @@
 // the inline card and the expand modal render from one source of truth
 // (house pattern from the staff analytics page).
 import { useEffect, useRef, useState } from 'react';
-import { FiMaximize2, FiX } from 'react-icons/fi';
+import { FiCheck, FiCopy, FiDownload, FiMaximize2, FiX } from 'react-icons/fi';
+import { toBlob } from 'html-to-image';
 import {
   Bar,
   CartesianGrid,
@@ -11,7 +12,7 @@ import {
   ComposedChart,
   LabelList,
   Line,
-  ReferenceArea,
+  ReferenceLine,
   ResponsiveContainer,
   XAxis,
   YAxis,
@@ -21,15 +22,16 @@ import { reasonCopy } from '../reasons.js';
 import '../styles/report.css';
 
 // Chart colours are JS-side constants (recharts props take literals); values
-// mirror the --chart-* tokens in tokens.css. Load bars are a measurement so
-// they stay a cool neutral blue; amber marks flagged (no-effort) answers;
-// the level line takes the staff accent, per the house trend-line rule.
-const BAR = '#3b82f6';
+// mirror the --chart-* tokens in tokens.css. One palette on purpose: bars are
+// a light tint of the staff green (a measurement, quiet), the level line is
+// the full accent (the decision path, loud), amber is reserved for flagged
+// no-effort answers, and the effort thresholds are neutral slate.
+const BAR = '#7bb095';
 const FLAG = '#f59e0b';
 const LINE = '#237a4e';
 const GRID = '#e6e9ee';
 const TICK = '#64748b';
-const BAND_FILL = 'rgba(148, 163, 184, 0.12)';
+const BAND_LINE = '#cbd5e1';
 
 const RESULT_PILL = {
   correct: ['kr-pill--good', 'Right'],
@@ -90,19 +92,80 @@ function Kpi({ label, sub, pill, children }) {
   );
 }
 
-// Chart card with a hover-reveal expand control (house expand-to-modal).
-function ChartCard({ title, sub, onExpand, children }) {
+// Chart card with the house hover-reveal control set: expand-to-modal,
+// copy-as-image, download-as-PNG (same trio behaviour as UQwest staff
+// analytics; capture via html-to-image at 2x for deck-quality pixels).
+function ChartCard({ title, sub, onExpand, exportName, children }) {
+  const ref = useRef(null);
+  const [copied, setCopied] = useState(false);
+
+  const snapshot = () =>
+    toBlob(ref.current, {
+      backgroundColor: '#ffffff',
+      pixelRatio: 2,
+      // The hover controls must not appear in the exported image.
+      filter: (node) => !(node.classList && node.classList.contains('rp-card__ctrls')),
+    });
+
+  const copyImage = async () => {
+    try {
+      const blob = await snapshot();
+      if (blob && navigator.clipboard?.write) {
+        await navigator.clipboard.write([new window.ClipboardItem({ 'image/png': blob })]);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 1600);
+      }
+    } catch {
+      // Capture or clipboard-image unsupported in this browser - fail quietly.
+    }
+  };
+
+  const downloadImage = async () => {
+    try {
+      const blob = await snapshot();
+      if (!blob) return;
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = exportName;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      // Same quiet failure as copy.
+    }
+  };
+
   return (
-    <section className="kr-card rp-card">
-      <button
-        type="button"
-        className="rp-card__expand"
-        onClick={onExpand}
-        aria-label="Expand chart"
-        title="Expand"
-      >
-        <FiMaximize2 aria-hidden="true" />
-      </button>
+    <section className="kr-card rp-card" ref={ref}>
+      <div className="rp-card__ctrls">
+        <button
+          type="button"
+          className="rp-card__ctrl"
+          onClick={onExpand}
+          aria-label="Expand chart"
+          title="Expand"
+        >
+          <FiMaximize2 aria-hidden="true" />
+        </button>
+        <button
+          type="button"
+          className="rp-card__ctrl"
+          onClick={downloadImage}
+          aria-label="Download chart as PNG"
+          title="Download PNG"
+        >
+          <FiDownload aria-hidden="true" />
+        </button>
+        <button
+          type="button"
+          className="rp-card__ctrl"
+          onClick={copyImage}
+          aria-label="Copy chart as image"
+          title={copied ? 'Copied' : 'Copy chart'}
+        >
+          {copied ? <FiCheck aria-hidden="true" /> : <FiCopy aria-hidden="true" />}
+        </button>
+      </div>
       <h2 className="rp-card__title">{title}</h2>
       <p className="rp-card__sub">{sub}</p>
       {children}
@@ -171,16 +234,15 @@ export default function ReportScreen({ sessionId, onNewSession }) {
     <ResponsiveContainer width="100%" height={big ? 460 : 280}>
       <ComposedChart data={tasks} margin={{ top: 24, right: 8, left: 8, bottom: 0 }}>
         <CartesianGrid vertical={false} strokeDasharray="4 4" stroke={GRID} />
-        {/* The convergence band: where effort should sit for a level to count. */}
-        <ReferenceArea yAxisId="load" y1={bandLo} y2={bandHi} fill={BAND_FILL} stroke="none" />
         <XAxis
           dataKey="n"
           axisLine={false}
           tickLine={false}
           tick={{ fontSize: 12, fill: TICK }}
         />
-        {/* Two y-axes on purpose: load is a continuous ratio, level is an
-            integer 1 to 5. On one axis the line flattens into a stripe. */}
+        {/* One visible axis (load). A second labelled axis for level invited
+            reading a level against the load ruler; the level line carries its
+            own numbers instead, on a hidden scale so it never flattens. */}
         <YAxis
           yAxisId="load"
           axisLine={false}
@@ -191,16 +253,11 @@ export default function ReportScreen({ sessionId, onNewSession }) {
           domain={[0, (dataMax) => Math.ceil(Math.max(dataMax * 1.15, bandHi * 1.1))]}
           tick={{ fontSize: 12, fill: TICK }}
         />
-        <YAxis
-          yAxisId="level"
-          orientation="right"
-          axisLine={false}
-          tickLine={false}
-          width={30}
-          domain={[0.5, 5.5]}
-          ticks={[1, 2, 3, 4, 5]}
-          tick={{ fontSize: 12, fill: TICK }}
-        />
+        <YAxis yAxisId="level" hide domain={[0.5, report.level_max + 0.5]} />
+        {/* Effort thresholds, not a data region: full-width dashed lines
+            (a ReferenceArea on a category axis stops at the category centres). */}
+        <ReferenceLine yAxisId="load" y={bandLo} stroke={BAND_LINE} strokeDasharray="6 4" />
+        <ReferenceLine yAxisId="load" y={bandHi} stroke={BAND_LINE} strokeDasharray="6 4" />
         {/* No entry animation on the bars: recharts' first-mount bar animation
             races the container measure and can leave the rects unpainted (the
             labels still show). The line draw below is the reveal moment. */}
@@ -221,6 +278,9 @@ export default function ReportScreen({ sessionId, onNewSession }) {
             style={{ fontSize: 12, fontWeight: 700, fill: '#0f172a' }}
           />
         </Bar>
+        {/* Animation off here too: the entry draw has the same first-mount
+            race as the bars, and a stuck draw leaves the path dash-hidden
+            with its labels waiting forever. */}
         <Line
           yAxisId="level"
           type="linear"
@@ -228,7 +288,15 @@ export default function ReportScreen({ sessionId, onNewSession }) {
           stroke={LINE}
           strokeWidth={2.5}
           dot={{ r: 4, fill: '#ffffff', stroke: LINE, strokeWidth: 2 }}
-        />
+          isAnimationActive={false}
+        >
+          <LabelList
+            dataKey="level"
+            position="top"
+            offset={10}
+            style={{ fontSize: 11, fontWeight: 700, fill: LINE }}
+          />
+        </Line>
       </ComposedChart>
     </ResponsiveContainer>
   );
@@ -250,13 +318,14 @@ export default function ReportScreen({ sessionId, onNewSession }) {
         Task difficulty level
       </li>
       <li>
-        <span className="rp-legend__swatch rp-legend__swatch--band" />
+        <span className="rp-legend__dash" />
         Target effort band ({bandLo.toFixed(1)} to {bandHi.toFixed(1)})
       </li>
     </ul>
   );
 
-  const chartSub = 'Bars: load per task, multiple of resting baseline. Line: difficulty level.';
+  const chartSub =
+    'Bars: load per task, multiple of resting baseline. Line: difficulty level, labelled at each point.';
 
   return (
     <div className="rp-report">
@@ -291,7 +360,10 @@ export default function ReportScreen({ sessionId, onNewSession }) {
             )
           }
         >
-          Level <CountUp value={report.final_level} />
+          {/* "of 5" keeps the scale visible: a bare "Level 1" reads as a bad
+              outcome instead of a position on a 5-point instrument. */}
+          Level <CountUp value={report.final_level} />{' '}
+          <span className="rp-kpi__scale">of {report.level_max}</span>
         </Kpi>
         <Kpi label="Accuracy" sub={`${nCorrect} of ${tasks.length} tasks right`}>
           <CountUp value={Math.round(report.accuracy * 100)} suffix="%" />
@@ -312,6 +384,7 @@ export default function ReportScreen({ sessionId, onNewSession }) {
           title="Load and difficulty, task by task"
           sub={chartSub}
           onExpand={() => setExpanded(true)}
+          exportName={`kaira_${report.patient_ref}_load.png`}
         >
           {chartBody(false)}
           {legend}
@@ -369,6 +442,13 @@ export default function ReportScreen({ sessionId, onNewSession }) {
           </table>
         </div>
       </section>
+
+      {/* The quiet line that answers "is this a diagnosis?" before a judge
+          or clinician has to ask it. */}
+      <p className="rp-disclaimer kr-reveal kr-reveal--4">
+        Load is measured against this patient's own resting baseline. Values are not comparable
+        between patients, and this report is a measurement, not a diagnostic output.
+      </p>
 
       {/* Expand modal: same chart, large. Click backdrop or Esc to close. */}
       {expanded && (

@@ -8,9 +8,12 @@
          carries page titles and hero numerals. Same weights UQwest loads. -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <!-- crossorigin makes the sheet CORS-readable so html-to-image can embed
+         the real fonts into chart exports instead of falling back silently. -->
     <link
       href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Source+Serif+4:wght@400;600&display=swap"
       rel="stylesheet"
+      crossorigin="anonymous"
     />
     <title>Kaira</title>
   </head>

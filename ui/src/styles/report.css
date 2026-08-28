@@ -71,6 +71,13 @@
   text-wrap: balance;
 }
 
+/* The "of 5" scale marker inside a KPI value: present but subordinate. */
+.rp-kpi__scale {
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: var(--text-tertiary);
+}
+
 /* ---- Chart card ---------------------------------------------------------------- */
 
 .rp-card {
@@ -93,11 +100,28 @@
   margin: 0 0 1rem;
 }
 
-/* Hover-reveal expand, top-right (house pattern). */
-.rp-card__expand {
+/* Hover-reveal control cluster, top-right (house pattern): expand, download,
+   copy. One container fades in; the buttons share one chrome. */
+.rp-card__ctrls {
   position: absolute;
   top: 0.9rem;
   right: 0.9rem;
+  display: flex;
+  gap: 8px;
+  opacity: 0;
+  transform: translateY(-2px);
+  pointer-events: none;
+  transition: opacity 0.18s ease, transform 0.18s ease;
+}
+
+.rp-card:hover .rp-card__ctrls,
+.rp-card__ctrls:focus-within {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+.rp-card__ctrl {
   width: 30px;
   height: 30px;
   display: inline-flex;
@@ -108,27 +132,16 @@
   background: #ffffff;
   color: #64748b;
   cursor: pointer;
-  opacity: 0;
-  transform: translateY(-2px);
-  pointer-events: none;
-  transition: opacity 0.18s ease, transform 0.18s ease, color 0.15s, border-color 0.15s,
-    background 0.15s;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
 }
 
-.rp-card:hover .rp-card__expand,
-.rp-card__expand:focus-visible {
-  opacity: 1;
-  transform: translateY(0);
-  pointer-events: auto;
-}
-
-.rp-card__expand:hover {
+.rp-card__ctrl:hover {
   background: #f4f5f8;
   color: #0f172a;
   border-color: #cbd5e1;
 }
 
-.rp-card__expand svg {
+.rp-card__ctrl svg {
   width: 15px;
   height: 15px;
 }
@@ -162,15 +175,17 @@
   flex-shrink: 0;
 }
 
-.rp-legend__swatch--band {
-  background: rgba(148, 163, 184, 0.25);
-  border: 1px solid var(--border-soft);
-}
-
 .rp-legend__line {
   width: 18px;
   height: 3px;
   border-radius: 2px;
+  flex-shrink: 0;
+}
+
+/* The band is drawn as dashed threshold lines; the swatch matches. */
+.rp-legend__dash {
+  width: 18px;
+  border-top: 2px dashed #cbd5e1;
   flex-shrink: 0;
 }
 
@@ -291,6 +306,15 @@
   .rp-response {
     text-align: right;
   }
+}
+
+/* Non-diagnostic note: quiet, but present on every report. */
+.rp-disclaimer {
+  margin: 4px 0 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--text-tertiary);
+  text-wrap: pretty;
 }
 
 /* ---- Expand modal ------------------------------------------------------------------ */

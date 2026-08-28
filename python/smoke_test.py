@@ -48,7 +48,7 @@ def run() -> None:
     assert r["converged"] and s.ended
 
     rep = s.report()
-    assert rep["final_level"] == start - 1
+    assert rep["final_level"] == start - 1 and rep["level_max"] == 5
     assert rep["reason"] == session_mod.CONVERGED_REASON
     assert rep["accuracy"] == 0.75 and rep["disengaged_count"] == 0
     assert len(rep["tasks"]) == 4 and rep["mean_rt"] == 6.8
