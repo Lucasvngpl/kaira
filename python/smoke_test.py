@@ -18,13 +18,33 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import decide
 import features
 import session as session_mod
+import stream
 
 
 def run() -> None:
     # Shrink the baseline so the test runs in under a second.
     session_mod.BASELINE_SECONDS = 0.3
+    # Real features over placeholder noise jitter; seed for a deterministic run.
+    stream._rng = __import__("numpy").random.default_rng(7)
+
+    # --- real-pipeline sanity: noise through the hand-written load index ----
+    # No convergence coupling here; just prove the analysis produces finite,
+    # trusted, near-baseline numbers on synthetic data.
+    value = features.cognitive_load(stream.get_window(2.0), stream.fs, stream.ch_names)
+    assert isinstance(value, float) and math.isfinite(value)
+    s0 = session_mod.begin("PT-TEST0", "Memory")
+    time.sleep(0.35)
+    s0.baseline_status()
+    s0.next_task()
+    live0 = s0.live_load()
+    assert live0["trusted"] and 0.5 < live0["load"] < 2.0, "white-noise load should hover near baseline"
 
     # --- happy path: ease down once, then converge with three corrects ------
+    # Convergence depends on loads staying inside the band, so the plumbing
+    # test injects a constant load (log 0.0 = exactly baseline) instead of
+    # riding the noise; the real pipeline is covered by the sanity block above.
+    real_cognitive_load_hp = features.cognitive_load
+    features.cognitive_load = lambda window, fs, ch_names: 0.0
     s = session_mod.begin("PT-TEST", "Memory")
     status = s.baseline_status()
     assert not status["done"] and 0 <= status["progress"] < 1
@@ -37,7 +57,7 @@ def run() -> None:
     assert t1["n"] == 1 and t1["level"] == start and t1["total_max"] == session_mod.MAX_TASKS
     assert t1 == s.next_task(), "next_task must be idempotent until answered"
     live = s.live_load()
-    assert live["trusted"] and live["load"] == 1.0, "placeholder load must be exactly baseline"
+    assert live["trusted"] and live["load"] == 1.0, "injected constant load must read exactly baseline"
     r1 = s.submit_answer(t1["task_id"], "incorrect", 12.0)
     assert r1["action"] == "ease" and r1["next_level"] == start - 1 and not r1["converged"]
 
@@ -53,6 +73,7 @@ def run() -> None:
     assert rep["accuracy"] == 0.75 and rep["disengaged_count"] == 0
     assert len(rep["tasks"]) == 4 and rep["mean_rt"] == 6.8
     assert {"n", "task_id", "kind", "level", "result", "load", "trusted", "rt", "action", "reason", "flag"} <= set(rep["tasks"][0])
+    features.cognitive_load = real_cognitive_load_hp
 
     # --- four-quadrant wiring: injected loads through a quadrant stand-in ----
     # The placeholder decide ignores load, so until the real algorithm lands,
@@ -65,10 +86,10 @@ def run() -> None:
             return ("advance", "correct_easy") if trial.load < lo else ("hold", "correct_engaged")
         return ("flag", "incorrect_disengaged") if trial.load < lo else ("ease", "incorrect_engaged")
 
-    current = [0.0]  # absolute log-load the injected load_index reports
-    real_decide, real_load_index = decide.decide, features.load_index
+    current = [0.0]  # absolute log-load the injected cognitive_load reports
+    real_decide, real_cognitive_load = decide.decide, features.cognitive_load
     decide.decide = quadrant
-    features.load_index = lambda window, fs, ch_names: current[0]
+    features.cognitive_load = lambda window, fs, ch_names: current[0]
     try:
         s2 = session_mod.begin("PT-TEST2", "Memory")
         time.sleep(0.35)
@@ -91,7 +112,7 @@ def run() -> None:
         assert not s2.ended, "no three-correct run happened, so no convergence"
     finally:
         decide.decide = real_decide
-        features.load_index = real_load_index
+        features.cognitive_load = real_cognitive_load
 
     # --- cap path: timeouts bounce off level 1 until the task cap ends it ---
     s3 = session_mod.begin("PT-TEST3", "Memory")

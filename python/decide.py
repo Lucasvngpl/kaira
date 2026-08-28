@@ -46,13 +46,13 @@ from __future__ import annotations
 CONSECUTIVE_TO_CONVERGE = 3
 
 # The useful-effort band, as multiples of the patient's own resting baseline.
-# DEMO VALUE: the floor sits below 1.0 ONLY because the placeholder
-# features.load_index yields exactly 1.00x for every window, and the demo
-# could never converge under a higher floor. Once the real load_index lands,
-# retighten to something like (1.3, 3.0): with a floor below 1.0 the
-# "wrong without effort" branch can never fire, and that flag is the
-# product's differentiator. The band in force is written into every report,
-# so a stale value stays visible.
+# DEMO VALUE: the synthetic stream is white noise, so cognitive_load hovers
+# around 1.00x baseline and the floor must sit below 1.0 or the demo could
+# never converge. Once real recordings drive the pipeline, retighten to
+# something like (1.3, 3.0): with a floor below 1.0 the "wrong without
+# effort" branch can never fire, and that flag is the product's
+# differentiator. The band in force is written into every report, so a
+# stale value stays visible.
 LOAD_BAND = (0.8, 3.0)
 
 

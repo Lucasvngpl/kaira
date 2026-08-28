@@ -5,7 +5,7 @@ A clinician administers tasks; the system measures cognitive load from a 64-chan
 Built for the NOVA Biotech McGill Buildathon 2026 ("NeuroLoop", sponsored by ANT Neuro).
 
 The scaffold (orchestrator, API, UI, task bank) is complete and runs end-to-end on synthetic data.
-The four signal-chain modules are hand-written by the team and currently contain skeletons only; see "Scope" below.
+The signal-chain modules are hand-written by the team; the cognitive load index is implemented, the other three are skeletons for now (see "Scope" below).
 
 ## Layout
 
@@ -14,7 +14,7 @@ kaira/
 ├── python/
 │   ├── stream.py        SKELETON - BrainFlow acquisition          [Aarnav]
 │   ├── preprocess.py    SKELETON - filtering, artifact rejection  [Aarnav]
-│   ├── features.py      SKELETON - Welch, band power, load index  [Lucas]
+│   ├── features.py      cognitive load index (Welch theta/alpha)  [Lucas, hand-written]
 │   ├── decide.py        SKELETON - adaptive staircase             [Lucas]
 │   ├── session.py       orchestrator: one session's state and sequencing
 │   ├── tasks.py         task bank (Memory populated, levels 1-5)
@@ -88,8 +88,8 @@ The eego is DC-coupled (raw values around +4800 uV), M1/M2 are dead in the provi
 
 ## Scope: what is hand-written
 
-Buildathon AI policy: the team must be able to defend every line of the graded algorithm, so the four signal-chain files are skeletons with docstrings and TODOs, written by hand by the team.
-Their placeholder bodies return obviously fake values (`return 0.5`) that keep the demo running.
+Buildathon AI policy: the team must be able to defend every line of the graded algorithm, so the signal-chain files are written by hand by the team.
+`features.py` (the cognitive load index) is implemented; `stream.py`, `preprocess.py` and `decide.py` remain skeletons whose placeholder bodies keep the demo running on synthetic noise.
 
 The interface between the halves is fixed in each skeleton's docstring (and HANDOFF.md section 5).
 Changing it requires agreement on both branches.

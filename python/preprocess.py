@@ -7,7 +7,7 @@ features.py is allowed to trust. Its signature is NOT part of the fixed
 four-function interface in HANDOFF section 5; clean() below is the seam the
 scaffold proposes, because the report contract (section 7) needs a per-task
 `trusted` flag and artifact rejection is the only honest source of it.
-session.py calls clean() between get_window() and load_index() - if the team
+session.py calls clean() between get_window() and cognitive_load() - if the team
 changes this shape, update session._sample_load() to match.
 
 TODO(team) - the pipeline this file must implement, in order, and why:

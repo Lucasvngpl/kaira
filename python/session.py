@@ -5,7 +5,7 @@ modules). It never interprets EEG and never chooses difficulty on its own:
 signal work lives in stream/preprocess/features, adaptation policy in
 decide. This file only wires them together and keeps the books:
 
-    stream.get_window -> preprocess.clean -> features.load_index
+    stream.get_window -> preprocess.clean -> features.cognitive_load
                                    |
     clinician result  ->  decide.decide(state, trial)  ->  apply action
 
@@ -131,7 +131,7 @@ class Session:
         """One absolute load reading through the (stub) signal chain."""
         window = stream.get_window(SAMPLE_SECONDS)
         cleaned, trusted = preprocess.clean(window, stream.fs, stream.ch_names)
-        return features.load_index(cleaned, stream.fs, stream.ch_names), trusted
+        return features.cognitive_load(cleaned, stream.fs, stream.ch_names), trusted
 
     def _relative(self, load_log_abs: float) -> tuple[float, float]:
         """(load_log, multiple) of an absolute reading vs this patient's baseline."""
