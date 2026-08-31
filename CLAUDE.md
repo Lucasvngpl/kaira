@@ -17,7 +17,7 @@ Everything else (`session.py`, `tasks.py`, `api/`, `ui/`) is scaffold and fair g
 - `~/NOVA_ANT` (`EEG_flipcup`, `Eyes open eyes closed`, `Behavioral Data`, `Video`) holds EXAMPLE recordings from the same hardware, for validating the signal code offline only: the EO-EC 33x occipital-alpha check, and whether the load metric separates flip-cup outcomes. Copy what is needed into `data/` (gitignored).
 - So "proper data to test with" arrives in two steps: first the offline validation of `features.cognitive_load` against those examples (still to run), then live closed-loop runs (synthetic board anywhere, the real amplifier on Windows).
 - Until then, never judge visuals or adaptive behaviour by the noise-driven values; verify wiring with injected values instead (`python/smoke_test.py`, four-quadrant section).
-- decide's thresholds are fixed log units (`LOW_LOAD`/`HIGH_LOAD` = +-0.405, i.e. 0.67x-1.50x), placeholders until `calibrate_bands()` is run on real sessions. With noise-driven load hovering at 1.0x, most demo tasks land in the mid band: corrects climb, wrongs ease.
+- decide's thresholds are fixed log units, `LOW_LOAD`/`HIGH_LOAD` = +-0.30 (0.74x-1.35x), picked by the 2026-08-31 band-width sweep on the oddball recording (same right-level accuracy as +-0.405, more convergence, one task faster). One person's noise, so `calibrate_bands()` on real sessions stays the settled answer. With noise-driven load hovering at 1.0x, most demo tasks land mid: corrects climb, wrongs ease.
 
 ## The z-score plumbing, in plain words
 
