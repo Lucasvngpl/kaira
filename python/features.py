@@ -1,18 +1,5 @@
 """Spectral features and the cognitive load index.
 
-Team <TODO team number> - <TODO full member names>
-(The buildathon requires the algorithm file to carry team number and member
-names at the top; fill in before submission.)
-
-Owner: Lucas. Hand-written implementation (buildathon AI policy: every line
-here is the team's to defend).
-
-The index: log(frontal theta power / parietal alpha power). Frontal theta
-rises and parietal alpha suppresses with working-memory load; the log makes
-the ratio symmetric and lets baselines subtract instead of divide.
-Band powers come from a Welch PSD (2 s segments, 50% overlap) integrated
-over each band with Simpson's rule.
-
 Interface (fixed - session.py and the API are built against it):
     cognitive_load(window, fs, ch_names) -> float
     relative_load(current: float, baseline: float) -> float
@@ -27,7 +14,7 @@ import numpy as np
 from scipy import signal
 from scipy.integrate import simpson
 
-# Brain activity is a mix of rhythms; this index cares about two. Theta
+# Brain activity is a mix of rhythms; our index cares about two. Theta
 # (4-8 Hz) is a slow rhythm that grows over the forehead when you
 # concentrate. Alpha (8-12 Hz) is an "idling" rhythm at the back of the
 # head that fades as soon as you start working.
