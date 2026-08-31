@@ -19,6 +19,15 @@ Everything else (`session.py`, `tasks.py`, `api/`, `ui/`) is scaffold and fair g
 - Until then, never judge visuals or adaptive behaviour by the noise-driven values; verify wiring with injected values instead (`python/smoke_test.py`, four-quadrant section).
 - `decide.LOAD_BAND`'s 0.8 floor exists only because noise-driven load hovers at 1.0x. Retighten to ~1.3-3.0 once real recordings drive the pipeline, or the disengagement flag can never fire.
 
+## The z-score plumbing, in plain words
+
+- Everyone's brain signal wobbles a different amount even at rest. A fixed threshold like "1.4x baseline" treats a naturally twitchy signal and a naturally steady one the same, which is unfair in both directions.
+- So during the resting baseline the session now measures two things: the patient's average load (the zero point) and how much it wobbles around that average (`baseline_sd`, their personal yardstick).
+- Every task then gets a z-score: how many of THIS patient's own wobbles above THEIR resting level the effort was. The same shout is loud in a library and inaudible at a concert; z measures against the room the patient's brain actually is.
+- Division of labour: the scaffold computes and carries z (`trial.z`, `baseline_sd` in the report); `decide.py` (Lucas, hand-written) will express its real thresholds in z per the team doc, with the values calibrated on the flip-cup recordings, and `LOAD_BAND` in multiples then retires.
+- `BASELINE_SD_FLOOR` in session.py guards the degenerate case: a patient who sat unnaturally still would get a near-zero yardstick and absurd z-scores.
+- The clinician display does not change: humans keep seeing "1.4x baseline"; z is for the algorithm and the report JSON.
+
 ## Key resources
 
 - Challenge handout: `~/Downloads/Challenge Handout (2).pdf` (requirements, judging, deliverables).

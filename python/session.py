@@ -57,6 +57,12 @@ LEVEL_START = 2
 # The stopping rule and the effort band belong to the adaptive logic, so
 # they live in decide.py (decide.CONSECUTIVE_TO_CONVERGE, decide.LOAD_BAND).
 
+# Floor for the baseline's standard deviation (log units). z divides by the
+# SD, and a patient who sat unusually still would otherwise get a tiny SD
+# and absurdly inflated z-scores; the floor caps how much stillness can
+# amplify. Team-tunable once real recordings show typical resting spread.
+BASELINE_SD_FLOOR = 0.05
+
 # Actions decide.py may return; session applies them mechanically.
 ACTIONS = ("advance", "hold", "ease", "flag")
 
@@ -80,6 +86,7 @@ class Trial:
     rt: float  # seconds, from the clinician's stopwatch
     load: float  # multiple of baseline (exp of load_log) - what humans read
     load_log: float  # relative load in log units - what the math uses
+    z: float  # load_log / baseline SD: how unusual this reading is FOR THIS patient
     trusted: bool
     # Filled in after decide.decide() runs:
     action: str = ""
@@ -93,7 +100,8 @@ class DomainState:
 
     domain: str
     level: int
-    baseline: float  # resting load index, log units
+    baseline: float  # resting load index, log units (the mean of the rest samples)
+    baseline_sd: float = 0.0  # spread of those samples - this patient's own noise floor
     band: tuple[float, float] = decide.LOAD_BAND
     level_min: int = tasks.LEVEL_MIN
     level_max: int = tasks.LEVEL_MAX
@@ -160,6 +168,11 @@ class Session:
         if not self._baseline_samples:  # client never polled; one sample beats none
             self._baseline_samples.append(self._sample()[0])
         self.state.baseline = statistics.fmean(self._baseline_samples)
+        # The baseline's spread is the patient's personal yardstick: decide.py
+        # can express effort as z = load_log / baseline_sd, i.e. "how many of
+        # THIS patient's own resting wobbles above THEIR resting level".
+        spread = statistics.stdev(self._baseline_samples) if len(self._baseline_samples) >= 2 else 0.0
+        self.state.baseline_sd = max(spread, BASELINE_SD_FLOOR)
         self._baseline_done = True
 
     def _require_baseline(self) -> None:
@@ -241,6 +254,7 @@ class Session:
             rt=round(float(elapsed_seconds), 1),
             load=round(load, 2),
             load_log=load_log,
+            z=round(load_log / self.state.baseline_sd, 2),
             trusted=trusted,
         )
 
@@ -318,6 +332,7 @@ class Session:
             "reason": self.end_reason or "Session in progress",
             "converged": self.converged,
             "band": list(decide.LOAD_BAND),
+            "baseline_sd": round(self.state.baseline_sd, 3),  # the patient's yardstick behind each z
             "mean_rt": round(statistics.fmean(t.rt for t in answered), 1) if answered else None,
             "accuracy": round(sum(t.result == "correct" for t in h) / len(h), 2) if h else None,
             "disengaged_count": sum(t.flag for t in h),
@@ -329,6 +344,7 @@ class Session:
                     "level": t.level,
                     "result": t.result,
                     "load": t.load,
+                    "z": t.z,
                     "trusted": t.trusted,
                     "rt": t.rt,
                     "action": t.action,

@@ -38,6 +38,10 @@ TODO(team) - the logic this file exists for (HANDOFF section 1):
     clinically different and must not collapse).
   - Respect trial.trusted: an artifact-contaminated load number should not
     drive a level change.
+  - z is plumbed and waiting: trial.z = trial.load_log / state.baseline_sd,
+    i.e. effort in units of THIS patient's own resting variability. Write
+    the real thresholds in z (per the team doc) and calibrate the values on
+    the flip-cup recordings; LOAD_BAND in multiples then retires.
 """
 
 from __future__ import annotations

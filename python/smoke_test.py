@@ -38,6 +38,7 @@ def run() -> None:
     s0.next_task()
     live0 = s0.live_load()
     assert live0["trusted"] and 0.5 < live0["load"] < 2.0, "white-noise load should hover near baseline"
+    assert s0.state.baseline_sd >= session_mod.BASELINE_SD_FLOOR, "baseline must yield a usable SD"
 
     # --- happy path: ease down once, then converge with three corrects ------
     # Convergence depends on loads staying inside the band, so the plumbing
@@ -72,7 +73,7 @@ def run() -> None:
     assert rep["reason"] == session_mod.CONVERGED_REASON
     assert rep["accuracy"] == 0.75 and rep["disengaged_count"] == 0
     assert len(rep["tasks"]) == 4 and rep["mean_rt"] == 6.8
-    assert {"n", "task_id", "kind", "level", "result", "load", "trusted", "rt", "action", "reason", "flag"} <= set(rep["tasks"][0])
+    assert {"n", "task_id", "kind", "level", "result", "load", "z", "trusted", "rt", "action", "reason", "flag"} <= set(rep["tasks"][0])
     features.cognitive_load = real_cognitive_load_hp
 
     # --- four-quadrant wiring: injected loads through a quadrant stand-in ----
