@@ -37,6 +37,13 @@ from session import Session, SessionStateError  # noqa: E402
 # the board id"). Default ON so the demo never needs an amplifier.
 stream.SYNTHETIC = os.environ.get("KAIRA_SYNTHETIC", "1") != "0"
 
+# Rehearsal knob: the protocol baseline is 3 minutes, which is correct for a
+# patient and painful for a dev click-through. KAIRA_BASELINE_SECONDS=15
+# shortens it without code edits; unset means the real protocol.
+session_mod.BASELINE_SECONDS = float(
+    os.environ.get("KAIRA_BASELINE_SECONDS", session_mod.BASELINE_SECONDS)
+)
+
 app = FastAPI(title="Kaira", description="Adaptive cognitive assessment - demo API")
 
 # The React dev server is the only client; keep CORS scoped to it.

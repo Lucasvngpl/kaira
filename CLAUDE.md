@@ -46,6 +46,7 @@ Everything else (`session.py`, `tasks.py`, `api/`, `ui/`) is scaffold and fair g
 - Keep `python/smoke_test.py` green: `.venv/bin/python python/smoke_test.py`.
 - The UI follows the UQwest staff house style (`~/Side-Projects/UEP/frontend`): plain CSS with tokens, DM Sans + Source Serif 4, hairline cards at 12px radius, `kr-`/`sn-`/`rp-` class prefixes, axios behind `src/api.js`, hand-rolled chart legends, why-comments everywhere.
 - Live load is polled at 4 Hz (matches the real pipeline's 250 ms window step).
+- The resting baseline is 180 s (team protocol, 2026-08-31): the patient does nothing for 3 minutes while the session learns their average load AND its wobble. Rehearse with `KAIRA_BASELINE_SECONDS=15` on the API; never shorten the constant itself.
 - `http://localhost:5173/?demo=report` deep-links to the report screen with fabricated PT-SAMPLE data (`ui/src/sampleReport.js`) for UI work without running a session.
 - No em dashes anywhere, including UI copy and comments; use a plain dash.
 - Work happens on branches `lucas` and `aarnav`; changes to the fixed Python interface need both.

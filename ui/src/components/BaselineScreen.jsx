@@ -28,6 +28,12 @@ export default function BaselineScreen({ sessionId, seconds, onDone }) {
   );
 
   const remaining = Math.max(0, Math.ceil(seconds * (1 - progress)));
+  // "About 2:54 left" reads better than "About 174 s left" now that the
+  // protocol baseline is three minutes; short rehearsal baselines keep seconds.
+  const remainingText =
+    remaining >= 60
+      ? `${Math.floor(remaining / 60)}:${String(remaining % 60).padStart(2, '0')}`
+      : `${remaining} s`;
 
   return (
     <div className="sn-baseline kr-reveal">
@@ -41,7 +47,7 @@ export default function BaselineScreen({ sessionId, seconds, onDone }) {
           <span className="sn-progress__fill" style={{ width: `${progress * 100}%` }} />
         </div>
         <p className="sn-baseline__count">
-          {remaining > 0 ? `About ${remaining} s left` : 'Computing baseline'}
+          {remaining > 0 ? `About ${remainingText} left` : 'Computing baseline'}
         </p>
       </div>
     </div>

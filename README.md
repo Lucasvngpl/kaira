@@ -50,7 +50,8 @@ UI (second terminal):
 cd ui && npm run dev
 ```
 
-Open http://localhost:5173, enter a patient reference, and run a session: baseline records for 15 s, then tasks adapt until convergence (three consecutive correct at one level, inside the effort band) or the 12-task cap.
+Open http://localhost:5173, enter a patient reference, and run a session: the resting baseline records for 3 minutes (team protocol), then tasks adapt until convergence (three consecutive correct at one level, inside the effort band) or the 12-task cap.
+For rehearsal, start the API with `KAIRA_BASELINE_SECONDS=15` to shorten the baseline without touching code.
 The port is 8300 rather than 8000 because Django dev servers tend to occupy 8000.
 
 Quick health check without the UI:

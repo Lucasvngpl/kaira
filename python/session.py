@@ -37,9 +37,11 @@ import tasks
 
 # --- Tunables (session-level policy, not signal processing) -----------------
 
-# Resting-baseline recording length. A real protocol wants 60 s or more of
-# quiet rest; 15 s keeps the demo clickable. One constant to change.
-BASELINE_SECONDS = 15.0
+# Resting-baseline recording length. Team protocol (meeting 2026-08-31):
+# three minutes of doing nothing, so the mean AND the wobble (baseline_sd)
+# are measured on ~180 samples. For rehearsal the API honours
+# KAIRA_BASELINE_SECONDS to shorten it without touching this constant.
+BASELINE_SECONDS = 180.0
 
 # Window length per load sample. 2 s gives the (future, real) Welch estimate
 # enough samples at 512 Hz for stable low-frequency bands.
