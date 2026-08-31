@@ -27,6 +27,8 @@ from pydantic import BaseModel, Field
 # on sys.path instead of inventing package plumbing the team would trip over.
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "python"))
 
+import math
+
 import decide  # noqa: E402
 import session as session_mod  # noqa: E402
 import stream  # noqa: E402
@@ -92,9 +94,9 @@ def root() -> dict:
         "app": "kaira",
         "synthetic": stream.SYNTHETIC,
         "domains": {d: tasks.has_tasks(d) for d in tasks.domains()},
-        # The UI shades the live sparkline with the effort band, so the band
-        # in force is served rather than duplicated client-side.
-        "band": list(decide.LOAD_BAND),
+        # The UI shades the live sparkline with the effort band; multiples are
+        # DERIVED from decide's log thresholds so display and rule cannot drift.
+        "band": [round(math.exp(decide.LOW_LOAD), 2), round(math.exp(decide.HIGH_LOAD), 2)],
     }
 
 

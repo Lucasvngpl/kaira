@@ -1,104 +1,177 @@
-"""Adaptive staircase - SKELETON, hand-written by the team.
+"""The decision maker - hand-written by the team.
 
-Owner: Lucas. Deliberately empty of real code (buildathon AI policy): the
-effort-gated adaptation IS the product, so the team writes and defends it.
+The flow, in one breath: EEG becomes one load number per task (features.py),
+session.py subtracts the patient's resting baseline and hands the result
+here. This file buckets that effort into low / mid / high, looks at whether
+the answer was right, picks the next task's difficulty, and says when the
+session is over. Pure Python, a handful of numbers, no EEG, no I/O.
 
-Interface (fixed - session.py is built against it):
-    decide(state: DomainState, trial: Trial) -> tuple[Action, str]   # per-trial difficulty policy
-    converged(state: DomainState) -> int | None                      # stopping rule
-
-Both halves of the adaptive logic live here on purpose: when the session
-ends is a claim about when you have MEASURED someone's level, and a judge
-will ask the team to justify it - so it belongs in the hand-written file,
-not in the scaffold. session.py applies whatever this module returns,
-mechanically.
-
-Types live in session.py (DomainState, Trial). Action is one of the strings
-in session.ACTIONS, and session.py applies it mechanically:
-    "advance" -> difficulty level +1 (capped at 5)
-    "hold"    -> level unchanged
-    "ease"    -> level -1 (floored at 1)
-    "flag"    -> level unchanged AND the trial is marked flag=True:
-                 wrong with no measurable effort behind it - disengagement,
-                 not deficit. This flag is the product's differentiator; the
-                 report surfaces it separately.
-The second element of the tuple is a short machine-readable reason
-("correct_engaged", "incorrect_disengaged", ...) stored per task and shown in
-the report table.
-
-TODO(team) - the logic this file exists for (HANDOFF section 1):
-  - Right without effort (load well below band): the task was too easy -> advance.
-  - Right at normal effort (load inside band): working level -> hold; three of
-    these in a row at one level is convergence (session.py checks that).
-  - Wrong while working hard (load inside/above band): genuine limit -> ease.
-  - Wrong without effort (load well below band): do NOT assume deficit ->
-    flag disengagement, hold the level.
-  - Timeout arrives as result="timeout": treat like a wrong answer here;
-    session.py already records it separately (slow-but-correct and wrong are
-    clinically different and must not collapse).
-  - Respect trial.trusted: an artifact-contaminated load number should not
-    drive a level change.
-  - z is plumbed and waiting: trial.z = trial.load_log / state.baseline_sd,
-    i.e. effort in units of THIS patient's own resting variability. Write
-    the real thresholds in z (per the team doc) and calibrate the values on
-    the flip-cup recordings; LOAD_BAND in multiples then retires.
+The honest claim: this is a normal adaptive staircase (right = harder,
+wrong = easier) with exactly TWO cells changed by the EEG:
+  - right at HIGH effort holds (they are at their working edge, not past it)
+  - wrong at LOW effort repeats (no effort means disengaged, not "too hard")
 """
 
 from __future__ import annotations
 
-# How many consecutive correct answers, at one level, prove that level.
-CONSECUTIVE_TO_CONVERGE = 3
+import math
+from dataclasses import dataclass, field
 
-# The useful-effort band, as multiples of the patient's own resting baseline.
-# DEMO VALUE: the synthetic stream is white noise, so cognitive_load hovers
-# around 1.00x baseline and the floor must sit below 1.0 or the demo could
-# never converge. Once real recordings drive the pipeline, retighten to
-# something like (1.3, 3.0): with a floor below 1.0 the "wrong without
-# effort" branch can never fire, and that flag is the product's
-# differentiator. The band in force is written into every report, so a
-# stale value stays visible.
-LOAD_BAND = (0.8, 3.0)
+# Thresholds live in log units; the "0.67x / 1.50x" people see are derived,
+# never stored, so the rule and the display cannot drift apart. Symmetric in
+# log because that is what symmetry means for a ratio: 0.67 and 1.50 are
+# reciprocals. Guesses until real sessions exist - see calibrate_bands().
+LOW_LOAD = -0.405   # below this: not really trying (0.67x baseline)
+HIGH_LOAD = +0.405  # above this: working hard (1.50x baseline)
 
-
-def decide(state: "DomainState", trial: "Trial") -> tuple[str, str]:
-    """Pick the next action from the answered trial and the session state.
-
-    TODO(team): replace the placeholder with the effort-gated rules in the
-    module docstring. The placeholder below IGNORES THE EEG ENTIRELY - it
-    exists only so the demo adapts and converges before this file is real.
-    """
-    # PLACEHOLDER - not the algorithm:
-    if trial.result == "correct":
-        return "hold", "placeholder_correct"
-    return "ease", "placeholder_not_correct"
+START_LEVEL = 2  # our patients skew low-functioning, so start below the middle
+MIN_LEVEL = 1
+MAX_LEVEL = 5
+STEP = 1  # one level at a time; bigger jumps are hard to justify clinically
+MAX_TASKS = 12
+CONVERGENCE_RUN = 3  # one right answer can be a guess; three in a row is evidence
 
 
-def converged(state: "DomainState") -> int | None:
-    """The stopping rule: has this session measured the patient's level?
+def calibrate_bands(relative_loads, lo_pct=25, hi_pct=75):
+    """The successor to the guesses above: once real sessions exist, take the
+    bottom and top quartile of observed loads as the new LOW / HIGH."""
+    xs = sorted(relative_loads)
+    pick = lambda p: xs[min(len(xs) - 1, max(0, round(p / 100 * (len(xs) - 1))))]
+    return pick(lo_pct), pick(hi_pct)
 
-    Returns the established level, or None to keep testing. The session ends
-    when the last CONSECUTIVE_TO_CONVERGE trials are all correct, at one
-    difficulty level, with trusted load readings inside LOAD_BAND.
 
-    Why each condition earns its place:
-      - Three in a row: one correct answer can be a guess or a good day;
-        a run at the same level is the standard staircase evidence bar.
-      - One level: correct answers scattered across levels prove range,
-        not a level. The claim is "functions AT level N".
-      - Inside the band: a correct answer with no effort behind it says the
-        task was too easy, not that the level is established; effort in the
-        useful range is what validates the measurement. That validation is
-        what a pen-and-paper test cannot do.
-      - Trusted only: an artifact-contaminated load reading cannot validate
-        anything.
-    """
-    tail = state.history[-CONSECUTIVE_TO_CONVERGE:]
-    if len(tail) < CONSECUTIVE_TO_CONVERGE:
-        return None
-    lo, hi = LOAD_BAND
-    if all(
-        t.result == "correct" and t.level == tail[0].level and t.trusted and lo <= t.load <= hi
-        for t in tail
-    ):
-        return tail[0].level
-    return None
+def load_band(relative_load: float) -> str:
+    """One effort word: low, mid, or high."""
+    if relative_load < LOW_LOAD:
+        return "low"
+    if relative_load > HIGH_LOAD:
+        return "high"
+    return "mid"
+
+
+def load_bars(relative_load: float) -> int:
+    """The 1-5 meter for the UI. Bar 1 always means low, bar 5 always means
+    high (same comparisons as load_band, so they can never disagree); bars
+    2-4 just split the middle into thirds."""
+    third = (HIGH_LOAD - LOW_LOAD) / 3
+    return (
+        1
+        + (relative_load >= LOW_LOAD)
+        + (relative_load > LOW_LOAD + third)
+        + (relative_load > LOW_LOAD + 2 * third)
+        + (relative_load > HIGH_LOAD)
+    )
+
+
+def next_level(correct: bool, level: int, band: str) -> tuple[int, str]:
+    """The six-cell table. Hitting the top or bottom gets its own word
+    (ceiling / floor) because a run of those means something clinical."""
+    if correct:
+        if band == "high":
+            return level, "hold"  # EEG cell: right, but working hard - stay here
+        return (level, "ceiling") if level == MAX_LEVEL else (level + STEP, "up")
+    if band == "low":
+        return level, "repeat"  # EEG cell: no effort behind the miss - same level, new item
+    return (level, "floor") if level == MIN_LEVEL else (level - STEP, "down")
+
+
+# What the clinician reads for each way a session can end.
+END_TEXT = {
+    "converged": "Three consecutive correct at one level",
+    "ceiling": "May exceed the range of this task set",
+    "floor": "Could not perform at the lowest level",
+    "max_tasks": "Maximum task count reached without convergence",
+}
+
+
+def should_end(history) -> tuple[bool, str | None, int | None]:
+    """Is the session over, and what may we claim? Four different endings,
+    kept separate because flattening them lies: three failures at level 1
+    is a floor, not "converged at level 1"."""
+    tail = history[-CONVERGENCE_RUN:]
+    if len(tail) == CONVERGENCE_RUN and all(t.level == tail[0].level for t in tail):
+        if all(t.result == "correct" for t in tail):
+            # All three right at the top WITHOUT effort: the test ran out of
+            # difficulty, so say "may exceed", not "converged".
+            if tail[0].level == MAX_LEVEL and all(
+                t.trusted and load_band(t.load_log) == "low" for t in tail
+            ):
+                return True, "ceiling", MAX_LEVEL
+            return True, "converged", tail[0].level
+        if tail[0].level == MIN_LEVEL and all(t.result != "correct" for t in tail):
+            return True, "floor", MIN_LEVEL
+    if len(history) >= MAX_TASKS:
+        # Cap reached: report the most-visited level, and when two levels tie,
+        # claim the LOWER one - the cautious statement wins.
+        counts: dict[int, int] = {}
+        for t in history:
+            counts[t.level] = counts.get(t.level, 0) + 1
+        best = max(counts.values())
+        return True, "max_tasks", min(l for l, c in counts.items() if c == best)
+    return False, None, None
+
+
+@dataclass
+class Decision:
+    """Everything the UI needs after one task; the UI computes nothing."""
+
+    next_level: int
+    reason: str  # up | down | hold | repeat | ceiling | floor
+    reason_text: str  # the sentence the clinician reads
+    load_bars: int | None  # 1-5 meter, None when the window was untrusted
+    load_multiple: float | None  # the "1.4x baseline" number, None when untrusted
+    quadrant: str  # efficient | effortful | struggling | disengaged
+    flags: list[str] = field(default_factory=list)  # "disengaged", "untrusted"
+    ended: bool = False
+    end_reason: str | None = None
+    final_level: int | None = None
+
+
+_MOVE = {
+    "up": "stepping up to level {new}",
+    "down": "easing to level {new}",
+    "hold": "holding at level {new}",
+    "repeat": "repeating level {new} with a new item",
+    "ceiling": "already at the top level, holding at {new}",
+    "floor": "already at the lowest level, staying at {new}",
+}
+
+_VERDICT = {"correct": "Correct", "incorrect": "Wrong", "timeout": "Timed out"}
+
+
+def decide(trial, history) -> Decision:
+    """One answered task in, one Decision out. `history` is everything before
+    this task. Timeouts count as wrong (no answer is not a right answer)."""
+    correct = trial.result == "correct"
+    # Can't trust the window? Use the mid column - plain adaptive testing.
+    band = load_band(trial.load_log) if trial.trusted else "mid"
+    new_level, reason = next_level(correct, trial.level, band)
+
+    # Name the cell instead of inventing a blended score with no units.
+    quadrant = ("effortful" if band == "high" else "efficient") if correct else (
+        "disengaged" if band == "low" else "struggling"
+    )
+
+    flags = [] if trial.trusted else ["untrusted"]
+    # One no-effort miss can be a fluke; two in a row is worth telling the clinician.
+    prev = history[-1] if history else None
+    if reason == "repeat" and prev and prev.result != "correct" and prev.trusted \
+            and load_band(prev.load_log) == "low":
+        flags.append("disengaged")
+
+    effort = f"{band} effort" if trial.trusted else "untrusted signal"
+    text = f"{_VERDICT[trial.result]} at {effort} - {_MOVE[reason].format(new=new_level)}."
+
+    ended, end_reason, final_level = should_end(list(history) + [trial])
+    return Decision(
+        next_level=new_level,
+        reason=reason,
+        reason_text=text,
+        load_bars=load_bars(trial.load_log) if trial.trusted else None,
+        load_multiple=round(math.exp(trial.load_log), 2) if trial.trusted else None,
+        quadrant=quadrant,
+        flags=flags,
+        ended=ended,
+        end_reason=end_reason,
+        final_level=final_level,
+    )

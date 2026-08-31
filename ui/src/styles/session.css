@@ -204,6 +204,31 @@
   color: var(--text-tertiary);
 }
 
+/* ---- Effort meter -------------------------------------------------------------
+   Five segments, filled from the server's bars value: segment 1 = low band,
+   5 = high band, matching decide.py's thresholds by construction. */
+
+.sn-meter {
+  display: flex;
+  gap: 4px;
+  margin: 2px 0;
+}
+
+.sn-meter--off {
+  opacity: 0.4; /* untrusted window: the meter dims rather than lies */
+}
+
+.sn-meter__seg {
+  width: 22px;
+  height: 6px;
+  border-radius: 3px;
+  background: #eef1f4;
+}
+
+.sn-meter__seg--on {
+  background: var(--accent);
+}
+
 /* ---- Live sparkline ---------------------------------------------------------- */
 
 /* The last ~30 s of relative load. Secondary to the numeral on purpose:

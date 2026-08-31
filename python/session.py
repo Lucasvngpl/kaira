@@ -11,13 +11,11 @@ decide. This file only wires them together and keeps the books:
 
 Lifecycle: begin() -> poll baseline_status() until done -> loop
 [next_task() -> live_load() while the clinician runs it -> submit_answer()]
--> ends when decide.converged() says the level is established (the stopping
-rule is part of the graded algorithm, so it lives in decide.py) or on the
-task cap here -> report().
+-> ends when decide.should_end() says so (termination is part of the graded
+algorithm, so ALL of it lives in decide.py) -> report().
 
-Shared types (Trial, DomainState, ACTIONS) are defined here and referenced by
-decide.py via lazy annotations, so the skeleton needs no imports and there is
-no circular import (session imports decide, never the reverse).
+Trial and DomainState are defined here; decide.py reads them duck-typed, so
+there is no circular import (session imports decide, never the reverse).
 """
 
 from __future__ import annotations
@@ -47,17 +45,10 @@ BASELINE_SECONDS = 180.0
 # enough samples at 512 Hz for stable low-frequency bands.
 SAMPLE_SECONDS = 2.0
 
-# Hard cap so a session that never converges still ends and reports.
-MAX_TASKS = 12
-
-# Deliberately BELOW the CAT midpoint (3): the target population is patients
-# monitored for cognitive decline, so ability skews low - a spare trial of
-# downward headroom is worth more than symmetric information gain. A
-# high-functioning patient just spends one easy trial advancing.
-LEVEL_START = 2
-
-# The stopping rule and the effort band belong to the adaptive logic, so
-# they live in decide.py (decide.CONSECUTIVE_TO_CONVERGE, decide.LOAD_BAND).
+# All decision policy (start level, task cap, thresholds, termination) lives
+# in decide.py - session only holds state and applies Decisions mechanically.
+# One sanity check keeps decide's level range honest against the task bank.
+assert (decide.MIN_LEVEL, decide.MAX_LEVEL) == (tasks.LEVEL_MIN, tasks.LEVEL_MAX)
 
 # Floor for the baseline's standard deviation (log units). z divides by the
 # SD, and a patient who sat unusually still would otherwise get a tiny SD
@@ -65,11 +56,10 @@ LEVEL_START = 2
 # amplify. Team-tunable once real recordings show typical resting spread.
 BASELINE_SD_FLOOR = 0.05
 
-# Actions decide.py may return; session applies them mechanically.
-ACTIONS = ("advance", "hold", "ease", "flag")
-
-CONVERGED_REASON = "Three consecutive correct at stable load"
-MAXED_REASON = "Maximum task count reached without convergence"
+# The movement word shown in the report's action column, bucketed from
+# decide's richer reason keys (clamps read as their stationary movement).
+ACTION_WORD = {"up": "up", "down": "down", "hold": "hold", "ceiling": "hold",
+               "repeat": "repeat", "floor": "repeat"}
 
 
 class SessionStateError(RuntimeError):
@@ -90,23 +80,24 @@ class Trial:
     load_log: float  # relative load in log units - what the math uses
     z: float  # load_log / baseline SD: how unusual this reading is FOR THIS patient
     trusted: bool
-    # Filled in after decide.decide() runs:
-    action: str = ""
-    reason: str = ""
-    flag: bool = False  # wrong answer with no measurable effort = disengagement
+    # Filled in from the Decision after decide.decide() runs:
+    action: str = ""  # movement word: up | down | hold | repeat
+    reason: str = ""  # decide's machine key: up | down | hold | repeat | ceiling | floor
+    reason_text: str = ""  # the clinician-facing sentence, straight from decide
+    quadrant: str = ""  # efficient | effortful | struggling | disengaged
+    bars: int | None = None  # 1-5 effort meter, None when untrusted
+    flags: list[str] = field(default_factory=list)
+    flag: bool = False  # kept for the report contract: True iff "disengaged" in flags
 
 
 @dataclass
 class DomainState:
-    """Everything decide.py may condition on."""
+    """The session's running state; decide.py reads only the history."""
 
     domain: str
     level: int
     baseline: float  # resting load index, log units (the mean of the rest samples)
     baseline_sd: float = 0.0  # spread of those samples - this patient's own noise floor
-    band: tuple[float, float] = decide.LOAD_BAND
-    level_min: int = tasks.LEVEL_MIN
-    level_max: int = tasks.LEVEL_MAX
     history: list[Trial] = field(default_factory=list)
 
 
@@ -121,7 +112,7 @@ class Session:
         self.id = uuid.uuid4().hex[:12]
         self.patient_ref = patient_ref
         self.date = date.today().isoformat()
-        self.state = DomainState(domain=domain, level=LEVEL_START, baseline=0.0)
+        self.state = DomainState(domain=domain, level=decide.START_LEVEL, baseline=0.0)
         # Baseline recording starts at creation; progress is wall-clock.
         self._baseline_t0 = time.monotonic()
         self._baseline_samples: list[float] = []
@@ -203,7 +194,7 @@ class Session:
             "prompt": t.prompt,
             "answer": t.answer,
             "n": len(self.state.history) + 1,
-            "total_max": MAX_TASKS,
+            "total_max": decide.MAX_TASKS,
         }
 
     def _pick_task(self) -> tasks.Task:
@@ -233,7 +224,10 @@ class Session:
             # provisional mean so the readout is defined and drifts to ~1.0x.
             provisional = statistics.fmean(self._baseline_samples) if self._baseline_samples else value
             multiple = math.exp(features.relative_load(value, provisional))
-        return {"load": round(multiple, 2), "trusted": trusted}
+        # The 1-5 meter is server-computed from decide's own constants; the
+        # UI renders it and computes nothing.
+        bars = decide.load_bars(math.log(multiple)) if trusted else None
+        return {"load": round(multiple, 2), "trusted": trusted, "bars": bars}
 
     def submit_answer(self, task_id: str, result: str, elapsed_seconds: float) -> dict:
         """Record the clinician's verdict, let decide.py act on it, apply the action."""
@@ -260,28 +254,34 @@ class Session:
             trusted=trusted,
         )
 
-        action, reason = decide.decide(self.state, trial)
-        if action not in ACTIONS:
-            raise ValueError(f"decide returned unknown action {action!r}")
-        trial.action = action
-        trial.reason = reason
-        trial.flag = action == "flag"  # disengagement: hold the level, mark the trial
-        if action == "advance":
-            self.state.level = min(self.state.level_max, self.state.level + 1)
-        elif action == "ease":
-            self.state.level = max(self.state.level_min, self.state.level - 1)
+        d = decide.decide(trial, self.state.history)
+        trial.action = ACTION_WORD[d.reason]
+        trial.reason = d.reason
+        trial.reason_text = d.reason_text
+        trial.quadrant = d.quadrant
+        trial.bars = d.load_bars
+        trial.flags = d.flags
+        trial.flag = "disengaged" in d.flags
 
+        self.state.level = d.next_level
         self.state.history.append(trial)
         self._current = None
         self._task_samples = []
 
-        self._check_end(trial)
+        if d.ended:
+            self.ended = True
+            self.converged = d.end_reason == "converged"
+            self.end_reason = d.end_reason
+            self.final_level = d.final_level
         return {
-            "action": action,
+            "action": trial.action,
             "next_level": self.state.level,
             "load": trial.load,
             "converged": self.converged,
-            "reason": reason,
+            "reason": d.reason,
+            "reason_text": d.reason_text,
+            "bars": d.load_bars,
+            "flags": d.flags,
         }
 
     def _task_load(self) -> tuple[float, float, bool]:
@@ -297,23 +297,6 @@ class Session:
         value, trusted = self._sample()
         load_log, load = self._relative(value)
         return load_log, load, trusted
-
-    def _check_end(self, last: Trial) -> None:
-        """decide.converged() owns the stopping rule - when a level counts as
-        measured is part of the graded algorithm, not plumbing. Only the
-        never-converged task cap is scaffold policy and stays here.
-        """
-        level = decide.converged(self.state)
-        if level is not None:
-            self.ended = True
-            self.converged = True
-            self.final_level = level  # the level they proved, not any post-action level
-            self.end_reason = CONVERGED_REASON
-        elif len(self.state.history) >= MAX_TASKS:
-            self.ended = True
-            self.converged = False
-            self.final_level = last.level
-            self.end_reason = MAXED_REASON
 
     # --- report -------------------------------------------------------------
 
@@ -331,13 +314,17 @@ class Session:
             "date": self.date,
             "final_level": self.final_level if self.final_level is not None else self.state.level,
             "level_max": tasks.LEVEL_MAX,  # additive to the contract: the UI shows "Level N of MAX"
-            "reason": self.end_reason or "Session in progress",
+            "reason": decide.END_TEXT.get(self.end_reason, "Session in progress"),
+            "end_reason": self.end_reason,  # converged | ceiling | floor | max_tasks | ""
             "converged": self.converged,
-            "band": list(decide.LOAD_BAND),
+            # Display band derived from decide's thresholds (never stored twice).
+            "band": [round(math.exp(decide.LOW_LOAD), 2), round(math.exp(decide.HIGH_LOAD), 2)],
             "baseline_sd": round(self.state.baseline_sd, 3),  # the patient's yardstick behind each z
             "mean_rt": round(statistics.fmean(t.rt for t in answered), 1) if answered else None,
             "accuracy": round(sum(t.result == "correct" for t in h) / len(h), 2) if h else None,
             "disengaged_count": sum(t.flag for t in h),
+            # Above ~30% untrusted the whole session's loads deserve caution.
+            "untrusted_rate": round(sum(not t.trusted for t in h) / len(h), 2) if h else 0.0,
             "tasks": [
                 {
                     "n": t.n,
@@ -351,6 +338,9 @@ class Session:
                     "rt": t.rt,
                     "action": t.action,
                     "reason": t.reason,
+                    "reason_text": t.reason_text,
+                    "quadrant": t.quadrant,
+                    "bars": t.bars,
                     "flag": t.flag,
                 }
                 for t in h

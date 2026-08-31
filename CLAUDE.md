@@ -7,7 +7,7 @@ Full brief: `~/Downloads/HANDOFF.md`. Setup and run commands: `README.md`.
 
 `python/stream.py`, `preprocess.py`, `features.py`, `decide.py` are HAND-WRITTEN by the team.
 The competition AI policy requires every line of the algorithm to be defensible on the spot, so Claude does not implement them beyond the existing skeletons unless Lucas explicitly says otherwise.
-(Standing exceptions, Lucas-approved: the stopping rule `decide.converged()` is implemented, and `features.py` is Lucas's own hand-written implementation as of 2026-08-28 - its interface name is `cognitive_load`, his pick.)
+(Standing exceptions, Lucas-approved: `features.py` is his hand-written implementation (2026-08-28, interface name `cognitive_load`), and `decide.py` was implemented 2026-08-31 from his written spec (`~/Downloads/decide_py_prompt.md`) - a six-cell table where only two cells use the EEG, plus termination via `should_end`.)
 Everything else (`session.py`, `tasks.py`, `api/`, `ui/`) is scaffold and fair game.
 
 ## The data is fake until the real pipeline lands
@@ -17,14 +17,14 @@ Everything else (`session.py`, `tasks.py`, `api/`, `ui/`) is scaffold and fair g
 - `~/NOVA_ANT` (`EEG_flipcup`, `Eyes open eyes closed`, `Behavioral Data`, `Video`) holds EXAMPLE recordings from the same hardware, for validating the signal code offline only: the EO-EC 33x occipital-alpha check, and whether the load metric separates flip-cup outcomes. Copy what is needed into `data/` (gitignored).
 - So "proper data to test with" arrives in two steps: first the offline validation of `features.cognitive_load` against those examples (still to run), then live closed-loop runs (synthetic board anywhere, the real amplifier on Windows).
 - Until then, never judge visuals or adaptive behaviour by the noise-driven values; verify wiring with injected values instead (`python/smoke_test.py`, four-quadrant section).
-- `decide.LOAD_BAND`'s 0.8 floor exists only because noise-driven load hovers at 1.0x. Retighten to ~1.3-3.0 once real recordings drive the pipeline, or the disengagement flag can never fire.
+- decide's thresholds are fixed log units (`LOW_LOAD`/`HIGH_LOAD` = +-0.405, i.e. 0.67x-1.50x), placeholders until `calibrate_bands()` is run on real sessions. With noise-driven load hovering at 1.0x, most demo tasks land in the mid band: corrects climb, wrongs ease.
 
 ## The z-score plumbing, in plain words
 
 - Everyone's brain signal wobbles a different amount even at rest. A fixed threshold like "1.4x baseline" treats a naturally twitchy signal and a naturally steady one the same, which is unfair in both directions.
 - So during the resting baseline the session now measures two things: the patient's average load (the zero point) and how much it wobbles around that average (`baseline_sd`, their personal yardstick).
 - Every task then gets a z-score: how many of THIS patient's own wobbles above THEIR resting level the effort was. The same shout is loud in a library and inaudible at a concert; z measures against the room the patient's brain actually is.
-- Division of labour: the scaffold computes and carries z (`trial.z`, `baseline_sd` in the report); `decide.py` (Lucas, hand-written) will express its real thresholds in z per the team doc, with the values calibrated on the flip-cup recordings, and `LOAD_BAND` in multiples then retires.
+- Division of labour: the scaffold computes and carries z (`trial.z`, `baseline_sd` in the report). Lucas chose (2026-08-31) to ship decide.py on FIXED log thresholds for now; z stays plumbed and dormant until flip-cup calibration says which units win.
 - `BASELINE_SD_FLOOR` in session.py guards the degenerate case: a patient who sat unnaturally still would get a near-zero yardstick and absurd z-scores.
 - The clinician display does not change: humans keep seeing "1.4x baseline"; z is for the algorithm and the report JSON.
 
@@ -43,9 +43,9 @@ Everything else (`session.py`, `tasks.py`, `api/`, `ui/`) is scaffold and fair g
 
 - API on `127.0.0.1:8300` (8000 collides with Django dev servers). UI is Vite on 5173; CORS is pinned to that port.
 - Restart the API after editing `python/` (it does not run with --reload).
-- Keep `python/smoke_test.py` green: `.venv/bin/python python/smoke_test.py`.
+- Keep both suites green: `.venv/bin/python python/smoke_test.py` and `.venv/bin/python tests/test_decide.py`.
 - The UI follows the UQwest staff house style (`~/Side-Projects/UEP/frontend`): plain CSS with tokens, DM Sans + Source Serif 4, hairline cards at 12px radius, `kr-`/`sn-`/`rp-` class prefixes, axios behind `src/api.js`, hand-rolled chart legends, why-comments everywhere.
-- Live load is polled at 4 Hz (matches the real pipeline's 250 ms window step).
+- Live load is polled at 4 Hz (matches the real pipeline's 250 ms window step); the run screen's 1-5 effort meter and every clinician sentence (`reason_text`) are computed server-side - the UI computes nothing.
 - The resting baseline is 180 s (team protocol, 2026-08-31): the patient does nothing for 3 minutes while the session learns their average load AND its wobble. Rehearse with `KAIRA_BASELINE_SECONDS=15` on the API; never shorten the constant itself.
 - `http://localhost:5173/?demo=report` deep-links to the report screen with fabricated PT-SAMPLE data (`ui/src/sampleReport.js`) for UI work without running a session.
 - No em dashes anywhere, including UI copy and comments; use a plain dash.

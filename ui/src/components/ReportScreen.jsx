@@ -16,7 +16,6 @@ import {
   YAxis,
 } from 'recharts';
 import { getReport, errorText } from '../api.js';
-import { reasonCopy } from '../reasons.js';
 import { SAMPLE_REPORT } from '../sampleReport.js';
 import '../styles/report.css';
 
@@ -34,17 +33,19 @@ const LINE = '#237a4e';
 const TICK = '#0a1729';
 const AXIS = '#0a1729';
 
+// Each way a session can end gets its own pill; "floor" must never look
+// like convergence.
+const END_PILL = {
+  converged: ['kr-pill--good', 'Converged'],
+  ceiling: ['kr-pill--warn', 'Ceiling reached'],
+  floor: ['kr-pill--bad', 'At floor'],
+  max_tasks: ['kr-pill--idle', 'Task cap'],
+};
+
 const RESULT_PILL = {
   correct: ['kr-pill--good', 'Right'],
   incorrect: ['kr-pill--bad', 'Wrong'],
   timeout: ['kr-pill--warn', 'Timeout'],
-};
-
-const ACTION_COPY = {
-  advance: 'Raised difficulty',
-  hold: 'Held level',
-  ease: 'Eased difficulty',
-  flag: 'Flagged disengagement',
 };
 
 // Task kinds -> clinician-facing names; the machine id stays as a small
@@ -377,6 +378,13 @@ export default function ReportScreen({ sessionId, onNewSession, demo = false }) 
         </button>
       </header>
 
+      {report.untrusted_rate > 0.3 && (
+        <p className="kr-chip kr-chip--warn rp-flagnote kr-reveal">
+          {Math.round(report.untrusted_rate * 100)}% of tasks had untrusted signal. Treat the load
+          numbers with caution.
+        </p>
+      )}
+
       {report.disengaged_count > 0 && (
         <p className="kr-chip kr-chip--warn rp-flagnote kr-reveal">
           {report.disengaged_count} answer{report.disengaged_count === 1 ? '' : 's'} flagged: wrong
@@ -388,13 +396,10 @@ export default function ReportScreen({ sessionId, onNewSession, demo = false }) 
         <Kpi
           label="Established level"
           sub={report.reason}
-          pill={
-            report.converged ? (
-              <span className="kr-pill kr-pill--good">Converged</span>
-            ) : (
-              <span className="kr-pill kr-pill--idle">Did not converge</span>
-            )
-          }
+          pill={(() => {
+            const [cls, text] = END_PILL[report.end_reason] || ['kr-pill--idle', 'In progress'];
+            return <span className={`kr-pill ${cls}`}>{text}</span>;
+          })()}
         >
           {/* "of 5" keeps the scale visible: a bare "Level 1" reads as a bad
               outcome instead of a position on a 5-point instrument. */}
@@ -468,10 +473,9 @@ export default function ReportScreen({ sessionId, onNewSession, demo = false }) 
                       {t.rt.toFixed(1)} s
                     </td>
                     <td data-label="System response">
-                      <span className="rp-response">
-                        {ACTION_COPY[t.action] || t.action}
-                        <span className="rp-reason">{reasonCopy(t.reason)}</span>
-                      </span>
+                      {/* The sentence comes from decide.py itself; the UI
+                          never invents clinical wording. */}
+                      <span className="rp-response">{t.reason_text}</span>
                     </td>
                   </tr>
                 );

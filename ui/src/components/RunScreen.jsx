@@ -8,17 +8,21 @@ import { useEffect, useRef, useState } from 'react';
 import { FiArrowRight, FiCheck, FiClock, FiPlay, FiX } from 'react-icons/fi';
 import { getLiveLoad, getNextTask, postAnswer, errorText, isConflict } from '../api.js';
 import usePoll from '../hooks/usePoll.js';
-import { reasonCopy } from '../reasons.js';
 import '../styles/session.css';
 
-const ACTION_COPY = {
-  advance: (l) => `Raising difficulty to level ${l}`,
-  hold: (l) => `Holding at level ${l}`,
-  ease: (l) => `Easing to level ${l}`,
-  flag: (l) => `Flagging possible disengagement, holding level ${l}`,
-};
-
 const RESULT_COPY = { correct: 'Marked right', incorrect: 'Marked wrong', timeout: 'Marked timeout' };
+
+// 5-segment effort meter. The fill count comes from the server (decide.py
+// derives it from the same constants as the rule) - the UI computes nothing.
+function EffortMeter({ bars }) {
+  return (
+    <div className={`sn-meter${bars == null ? ' sn-meter--off' : ''}`} aria-hidden="true">
+      {[1, 2, 3, 4, 5].map((i) => (
+        <span key={i} className={`sn-meter__seg${bars != null && i <= bars ? ' sn-meter__seg--on' : ''}`} />
+      ))}
+    </div>
+  );
+}
 
 // Live-load sampling: 4 Hz (matches the real pipeline's 250 ms window step),
 // keeping a rolling ~30 s window. The first 2 s of a task show a warm-up
@@ -77,7 +81,7 @@ function LoadSparkline({ samples, band, paused }) {
   );
 }
 
-export default function RunScreen({ session, band = [0.8, 3.0], onFinished }) {
+export default function RunScreen({ session, band = [0.67, 1.5], onFinished }) {
   // band prop comes from GET /; the literal is only a render fallback while
   // that first fetch is in flight.
   const [task, setTask] = useState(null);
@@ -243,11 +247,9 @@ export default function RunScreen({ session, band = [0.8, 3.0], onFinished }) {
 
                 {stage === 'submitted' && outcome && (
                   <div className="sn-outcome">
-                    {/* The WHY leads: the effort-gated reason is the product,
-                        so it gets the headline, not just the level movement. */}
-                    <p className="sn-outcome__headline">
-                      {reasonCopy(outcome.reason)}. {ACTION_COPY[outcome.action](outcome.next_level)}.
-                    </p>
+                    {/* The WHY leads, and the sentence comes from decide.py
+                        itself - the UI never invents clinical wording. */}
+                    <p className="sn-outcome__headline">{outcome.reason_text}</p>
                     <p className="sn-outcome__reason">
                       {RESULT_COPY[lastResult]} · Load {outcome.load.toFixed(2)}&times; baseline
                     </p>
@@ -297,6 +299,7 @@ export default function RunScreen({ session, band = [0.8, 3.0], onFinished }) {
                   {live.load.toFixed(2)}
                   <span className="sn-load__unit">&times; baseline</span>
                 </span>
+                <EffortMeter bars={stage === 'running' ? live.bars : null} />
                 {live.trusted ? (
                   <span className="kr-chip">Signal clean</span>
                 ) : (
