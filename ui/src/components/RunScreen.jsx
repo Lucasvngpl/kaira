@@ -81,9 +81,9 @@ function LoadSparkline({ samples, band, paused }) {
   );
 }
 
-export default function RunScreen({ session, band = [0.67, 1.5], onFinished }) {
-  // band prop comes from GET /; the literal is only a render fallback while
-  // that first fetch is in flight.
+export default function RunScreen({ session, baseline, band = [0.74, 1.35], onFinished }) {
+  // band prop comes from GET /; the literal (exp of decide.py's +-0.30
+  // thresholds) is only a render fallback while that first fetch is in flight.
   const [task, setTask] = useState(null);
   const [stage, setStage] = useState('reading'); // reading | running | submitted
   const [outcome, setOutcome] = useState(null); // answer response, shown between tasks
@@ -149,9 +149,9 @@ export default function RunScreen({ session, band = [0.67, 1.5], onFinished }) {
     setError('');
     try {
       const resp = await postAnswer(session.id, task.task_id, result, (Date.now() - t0Ref.current) / 1000);
-      // Session over? Either it converged, or this was the last task before
-      // the cap (the response itself does not carry "ended"; n vs total_max does).
-      if (resp.converged || task.n >= task.total_max) {
+      // Session over is a server fact (converged, floor, ceiling, no-effort
+      // stop, or the task cap) - the UI never reconstructs it.
+      if (resp.ended) {
         onFinished();
         return;
       }
@@ -253,6 +253,9 @@ export default function RunScreen({ session, band = [0.67, 1.5], onFinished }) {
                     <p className="sn-outcome__reason">
                       {RESULT_COPY[lastResult]} · Load {outcome.load.toFixed(2)}&times; baseline
                     </p>
+                    {/* The effort the decision actually used - the task's own
+                        reading, not the live one (null when untrusted). */}
+                    <EffortMeter bars={outcome.bars} />
                     <button className="kr-action kr-action--primary" onClick={next}>
                       Next task
                       <FiArrowRight aria-hidden="true" />
@@ -317,6 +320,16 @@ export default function RunScreen({ session, band = [0.67, 1.5], onFinished }) {
               How hard the brain is working right now, relative to this patient's own resting
               baseline. It decides the next task together with the answer.
             </p>
+            {/* Baseline provenance. A baseline that never settled makes every
+                number on this card shaky - the clinician must know. */}
+            {baseline && !baseline.stable && (
+              <span className="kr-chip kr-chip--warn">
+                Baseline never settled - check electrodes, consider restarting
+              </span>
+            )}
+            {baseline?.stable && baseline.seconds < session.baselineSeconds - 1 && (
+              <p className="kr-hint">Baseline settled after {Math.round(baseline.seconds)} s.</p>
+            )}
           </div>
         </section>
       </div>

@@ -39,6 +39,7 @@ const END_PILL = {
   converged: ['kr-pill--good', 'Converged'],
   ceiling: ['kr-pill--warn', 'Ceiling reached'],
   floor: ['kr-pill--bad', 'At floor'],
+  no_effort: ['kr-pill--bad', 'No effort'],
   max_tasks: ['kr-pill--idle', 'Task cap'],
 };
 
@@ -378,6 +379,13 @@ export default function ReportScreen({ sessionId, onNewSession, demo = false }) 
         </button>
       </header>
 
+      {report.baseline_stable === false && (
+        <p className="kr-chip kr-chip--warn rp-flagnote kr-reveal">
+          The resting baseline never settled, so every load here is measured against a shaky zero
+          point. Consider repeating the assessment.
+        </p>
+      )}
+
       {report.untrusted_rate > 0.3 && (
         <p className="kr-chip kr-chip--warn rp-flagnote kr-reveal">
           {Math.round(report.untrusted_rate * 100)}% of tasks had untrusted signal. Treat the load
@@ -402,9 +410,17 @@ export default function ReportScreen({ sessionId, onNewSession, demo = false }) 
           })()}
         >
           {/* "of 5" keeps the scale visible: a bare "Level 1" reads as a bad
-              outcome instead of a position on a 5-point instrument. */}
-          Level <CountUp value={report.final_level} />{' '}
-          <span className="rp-kpi__scale">of {report.level_max}</span>
+              outcome instead of a position on a 5-point instrument. A null
+              final_level (no-effort stop) supports no level claim: show a
+              dash, never a number the data cannot back. */}
+          {report.final_level == null ? (
+            '-'
+          ) : (
+            <>
+              Level <CountUp value={report.final_level} />{' '}
+              <span className="rp-kpi__scale">of {report.level_max}</span>
+            </>
+          )}
         </Kpi>
         <Kpi label="Accuracy" sub={`${nCorrect} of ${tasks.length} tasks right`}>
           <CountUp value={Math.round(report.accuracy * 100)} suffix="%" />

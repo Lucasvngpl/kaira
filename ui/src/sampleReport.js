@@ -15,6 +15,8 @@ export const SAMPLE_REPORT = {
   converged: true,
   band: [0.74, 1.35],
   baseline_sd: 0.21,
+  baseline_seconds: 96, // settled early, as a good recording should
+  baseline_stable: true,
   mean_rt: 9.8,
   accuracy: 0.63,
   disengaged_count: 1,

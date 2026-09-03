@@ -19,6 +19,7 @@ const DEMO = new URLSearchParams(window.location.search).get('demo');
 export default function App() {
   const [phase, setPhase] = useState(DEMO === 'report' ? 'report' : 'start'); // start | baseline | run | report
   const [session, setSession] = useState(null); // {id, baselineSeconds, patientRef, domain}
+  const [baseline, setBaseline] = useState(null); // {stable, seconds} from the finished baseline
   const [info, setInfo] = useState(null); // GET / : {synthetic, domains}
   const [infoError, setInfoError] = useState('');
 
@@ -41,6 +42,7 @@ export default function App() {
   const startOver = () => {
     setPhase('start');
     setSession(null);
+    setBaseline(null);
   };
 
   return (
@@ -58,7 +60,12 @@ export default function App() {
               document: its provenance belongs to the report content, not to
               whatever mode the API happens to be in while viewing it. */}
           {info?.synthetic && phase !== 'report' && (
-            <span className="kr-chip kr-chip--warn">Synthetic signal</span>
+            <span
+              className="kr-chip kr-chip--warn"
+              title="Numbers come from generated noise, not a patient. Disappears when a real amplifier is connected."
+            >
+              Demo signal
+            </span>
           )}
         </div>
       </div>
@@ -82,11 +89,19 @@ export default function App() {
         <BaselineScreen
           sessionId={session.id}
           seconds={session.baselineSeconds}
-          onDone={() => setPhase('run')}
+          onDone={(result) => {
+            setBaseline(result);
+            setPhase('run');
+          }}
         />
       )}
       {phase === 'run' && (
-        <RunScreen session={session} band={info?.band} onFinished={() => setPhase('report')} />
+        <RunScreen
+          session={session}
+          baseline={baseline}
+          band={info?.band}
+          onFinished={() => setPhase('report')}
+        />
       )}
       {phase === 'report' && (
         <ReportScreen

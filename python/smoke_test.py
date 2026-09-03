@@ -71,11 +71,12 @@ def run() -> None:
         _, r = play(s, HIGH, "correct")  # correct at high effort: the EEG cell
         assert (r["action"], r["next_level"], r["reason"]) == ("hold", 2, "hold")
         assert "high effort" in r["reason_text"] and r["bars"] == 5
+        assert not r["ended"], "session end is a server fact, and this is not the end"
         _, r = play(s, MID, "incorrect", rt=12.0)
         assert (r["reason"], r["next_level"]) == ("down", 1)
         for _ in range(3):
             _, r = play(s, HIGH, "correct")
-        assert r["converged"] and s.ended
+        assert r["converged"] and r["ended"] and s.ended
 
         rep = s.report()
         assert rep["final_level"] == 1 and rep["end_reason"] == "converged"
@@ -113,9 +114,19 @@ def run() -> None:
         s4 = begin_calibrated("PT-TEST4")
         for i in range(decide.MAX_TASKS):
             _, r = play(s4, MID, "correct" if i % 2 == 0 else "incorrect")
-        assert s4.ended and not r["converged"]
+        assert s4.ended and r["ended"] and not r["converged"]
         rep4 = s4.report()
         assert rep4["end_reason"] == "max_tasks" and rep4["final_level"] == 2
+
+        # --- no_effort: three no-effort misses stop the test, no level claim
+        s5 = begin_calibrated("PT-TEST5")
+        for _ in range(3):
+            _, r = play(s5, LOW, "incorrect")
+        assert s5.ended and r["ended"] and not r["converged"]
+        rep5 = s5.report()
+        assert rep5["end_reason"] == "no_effort" and rep5["final_level"] is None
+        assert rep5["reason"] == decide.END_TEXT["no_effort"]
+        assert rep5["disengaged_count"] == 2  # flagged on the 2nd and 3rd miss
 
         # --- guards ---------------------------------------------------------
         for fn in (s4.next_task, lambda: s4.submit_answer("x", "correct", 1.0)):
@@ -129,6 +140,41 @@ def run() -> None:
             raise AssertionError("unpopulated domain must be rejected")
         except ValueError:
             pass
+
+        # --- adaptive baseline: settles at the minimum, or flags at the cap -
+        # A fake clock stands in for time.monotonic so 3 protocol minutes run
+        # in milliseconds, deterministically (polling once per fake second).
+        real_time = session_mod.time
+
+        class Clock:
+            t = 0.0
+
+            @staticmethod
+            def monotonic():
+                return Clock.t
+
+        session_mod.time = Clock
+        session_mod.BASELINE_SECONDS = 180.0  # real protocol, fake clock
+        try:
+            current[0] = 0.0  # steady signal: should settle right at the 90 s minimum
+            s6 = session_mod.begin("PT-TEST6", "Memory")
+            for tick in range(1, 91):
+                Clock.t = float(tick)
+                st = s6.baseline_status()
+            assert st["done"] and st["stable"] and st["seconds"] == 90.0
+            rep6 = s6.report()
+            assert rep6["baseline_stable"] and rep6["baseline_seconds"] == 90
+
+            Clock.t = 0.0  # drifting signal: never settles, cap + flag
+            s7 = session_mod.begin("PT-TEST7", "Memory")
+            for tick in range(1, 181):
+                Clock.t = float(tick)
+                current[0] = tick * 0.01  # 0.3 drift per 30 s window, above tolerance
+                st = s7.baseline_status()
+            assert st["done"] and not st["stable"] and st["seconds"] == 180.0
+            assert s7.report()["baseline_stable"] is False
+        finally:
+            session_mod.time = real_time
     finally:
         features.cognitive_load = real_cognitive_load
 

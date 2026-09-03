@@ -82,12 +82,13 @@ END_TEXT = {
     "converged": "Three consecutive correct at one level",
     "ceiling": "May exceed the range of this task set",
     "floor": "Could not perform at the lowest level",
+    "no_effort": "No effort behind three consecutive misses - repeat the assessment",
     "max_tasks": "Maximum task count reached without convergence",
 }
 
 
 def should_end(history) -> tuple[bool, str | None, int | None]:
-    """Is the session over, and what may we claim? Four different endings,
+    """Is the session over, and what may we claim? Five different endings,
     kept separate because flattening them lies: three failures at level 1
     is a floor, not "converged at level 1".
 
@@ -105,6 +106,11 @@ def should_end(history) -> tuple[bool, str | None, int | None]:
             ):
                 return True, "ceiling", MAX_LEVEL
             return True, "converged", tail[0].level
+        # Three misses with no effort behind any of them: the patient was not
+        # doing the test, so the data supports no level claim at all. Checked
+        # before the floor - "could not perform" would be a lie here.
+        if all(t.result != "correct" and t.trusted and load_band(t.load_log) == "low" for t in tail):
+            return True, "no_effort", None
         if tail[0].level == MIN_LEVEL and all(t.result != "correct" for t in tail):
             return True, "floor", MIN_LEVEL
     if len(history) >= MAX_TASKS:

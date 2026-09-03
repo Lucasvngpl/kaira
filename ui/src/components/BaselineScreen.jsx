@@ -17,7 +17,9 @@ export default function BaselineScreen({ sessionId, seconds, onDone }) {
         setProgress(st.progress);
         if (st.done && !firedRef.current) {
           firedRef.current = true;
-          onDone();
+          // Hand the outcome up: how long it really ran, and whether the
+          // signal ever settled (RunScreen warns the clinician when not).
+          onDone({ stable: st.stable, seconds: st.seconds });
         }
       } catch {
         // A missed poll keeps the last painted progress; the next one catches up.
@@ -47,8 +49,10 @@ export default function BaselineScreen({ sessionId, seconds, onDone }) {
           <span className="sn-progress__fill" style={{ width: `${progress * 100}%` }} />
         </div>
         <p className="sn-baseline__count">
-          {remaining > 0 ? `About ${remainingText} left` : 'Computing baseline'}
+          {remaining > 0 ? `Up to ${remainingText} left` : 'Computing baseline'}
         </p>
+        {/* Only the real protocol adapts; short rehearsal baselines just run out. */}
+        {seconds > 90 && <p className="kr-hint">Ends early once the signal settles.</p>}
       </div>
     </div>
   );

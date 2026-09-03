@@ -35,11 +35,18 @@ import tasks
 
 # --- Tunables (session-level policy, not signal processing) -----------------
 
-# Resting-baseline recording length. Team protocol (meeting 2026-08-31):
-# three minutes of doing nothing, so the mean AND the wobble (baseline_sd)
-# are measured on ~180 samples. For rehearsal the API honours
-# KAIRA_BASELINE_SECONDS to shorten it without touching this constant.
-BASELINE_SECONDS = 180.0
+# Resting baseline, team protocol (2026-09-02): record at least 90 s, then
+# stop as soon as the signal has settled - the last two 30 s means within
+# 10% of each other - capped at 3 minutes. A baseline that never settles
+# falls back to the plain 3-minute average, flagged so the clinician can
+# check electrodes and decide whether to redo it. For rehearsal the API
+# honours KAIRA_BASELINE_SECONDS; an override at or below the minimum skips
+# the settling logic (plain average over that time, no flag).
+BASELINE_SECONDS = 180.0  # the cap
+BASELINE_MIN_SECONDS = 90.0
+BASELINE_CHECK_SECONDS = 30.0
+# "Within 10%" on a ratio scale is a log distance, same units as the loads.
+BASELINE_TOLERANCE = math.log(1.10)
 
 # Window length per load sample. 2 s gives the (future, real) Welch estimate
 # enough samples at 512 Hz for stable low-frequency bands.
@@ -115,8 +122,10 @@ class Session:
         self.state = DomainState(domain=domain, level=decide.START_LEVEL, baseline=0.0)
         # Baseline recording starts at creation; progress is wall-clock.
         self._baseline_t0 = time.monotonic()
-        self._baseline_samples: list[float] = []
+        self._baseline_samples: list[tuple[float, float]] = []  # (seconds since start, load)
         self._baseline_done = False
+        self.baseline_seconds = 0.0  # how long the baseline actually ran
+        self.baseline_stable = True  # False only when the settling check ran and never passed
         # Task bookkeeping.
         self._current: tasks.Task | None = None
         self._task_samples: list[tuple[float, bool]] = []  # (load_log_abs, trusted) polled during a task
@@ -152,27 +161,51 @@ class Session:
         if not self._baseline_done:
             value, trusted = self._sample()
             if trusted:
-                self._baseline_samples.append(value)
-            if elapsed >= BASELINE_SECONDS:
-                self._finalize_baseline()
-        return {"done": self._baseline_done, "progress": min(1.0, elapsed / BASELINE_SECONDS)}
+                self._baseline_samples.append((elapsed, value))
+            adaptive = BASELINE_SECONDS > BASELINE_MIN_SECONDS  # rehearsal overrides skip settling
+            if adaptive and elapsed >= BASELINE_MIN_SECONDS and self._settled(elapsed):
+                self._finalize_baseline(elapsed, stable=True)
+            elif elapsed >= BASELINE_SECONDS:
+                # Cap reached: plain average of everything. If the settling
+                # check was on and never passed, flag it for the clinician.
+                self._finalize_baseline(elapsed, stable=not adaptive)
+        return {
+            "done": self._baseline_done,
+            "progress": min(1.0, elapsed / BASELINE_SECONDS),
+            "stable": self.baseline_stable,
+            "seconds": round(self.baseline_seconds if self._baseline_done else elapsed, 1),
+        }
 
-    def _finalize_baseline(self) -> None:
-        if not self._baseline_samples:  # client never polled; one sample beats none
-            self._baseline_samples.append(self._sample()[0])
-        self.state.baseline = statistics.fmean(self._baseline_samples)
+    def _settled(self, now: float) -> bool:
+        """Has the signal settled? The last 30 s vs the 30 s before that."""
+        recent = [v for t, v in self._baseline_samples if t >= now - BASELINE_CHECK_SECONDS]
+        previous = [v for t, v in self._baseline_samples
+                    if now - 2 * BASELINE_CHECK_SECONDS <= t < now - BASELINE_CHECK_SECONDS]
+        if min(len(recent), len(previous)) < 5:  # too few polls to judge either half
+            return False
+        return abs(statistics.fmean(recent) - statistics.fmean(previous)) < BASELINE_TOLERANCE
+
+    def _finalize_baseline(self, elapsed: float, stable: bool) -> None:
+        values = [v for _, v in self._baseline_samples]
+        if not values:  # client never polled; one sample beats none
+            values = [self._sample()[0]]
+        self.state.baseline = statistics.fmean(values)
         # The baseline's spread is the patient's personal yardstick: decide.py
         # can express effort as z = load_log / baseline_sd, i.e. "how many of
         # THIS patient's own resting wobbles above THEIR resting level".
-        spread = statistics.stdev(self._baseline_samples) if len(self._baseline_samples) >= 2 else 0.0
+        spread = statistics.stdev(values) if len(values) >= 2 else 0.0
         self.state.baseline_sd = max(spread, BASELINE_SD_FLOOR)
+        self.baseline_seconds = elapsed
+        self.baseline_stable = stable
         self._baseline_done = True
 
     def _require_baseline(self) -> None:
         # Tolerate clients that slept through the baseline without polling.
+        # No polls means no settling verdict, so no instability flag either.
         if not self._baseline_done:
-            if time.monotonic() - self._baseline_t0 >= BASELINE_SECONDS:
-                self._finalize_baseline()
+            elapsed = time.monotonic() - self._baseline_t0
+            if elapsed >= BASELINE_SECONDS:
+                self._finalize_baseline(elapsed, stable=True)
             else:
                 raise SessionStateError("baseline recording still in progress")
 
@@ -222,7 +255,7 @@ class Session:
         else:
             # Mid-baseline there is no reference yet; compare against the
             # provisional mean so the readout is defined and drifts to ~1.0x.
-            provisional = statistics.fmean(self._baseline_samples) if self._baseline_samples else value
+            provisional = statistics.fmean(v for _, v in self._baseline_samples) if self._baseline_samples else value
             multiple = math.exp(features.relative_load(value, provisional))
         # The 1-5 meter is server-computed from decide's own constants; the
         # UI renders it and computes nothing.
@@ -277,6 +310,7 @@ class Session:
             "action": trial.action,
             "next_level": self.state.level,
             "load": trial.load,
+            "ended": self.ended,  # the server fact; the UI never infers session end
             "converged": self.converged,
             "reason": d.reason,
             "reason_text": d.reason_text,
@@ -312,14 +346,18 @@ class Session:
             "domain": self.state.domain,
             "patient_ref": self.patient_ref,
             "date": self.date,
-            "final_level": self.final_level if self.final_level is not None else self.state.level,
+            # None when the session ended without supporting a level claim
+            # (no_effort); mid-session it shows the current working level.
+            "final_level": self.final_level if self.ended else self.state.level,
             "level_max": tasks.LEVEL_MAX,  # additive to the contract: the UI shows "Level N of MAX"
             "reason": decide.END_TEXT.get(self.end_reason, "Session in progress"),
-            "end_reason": self.end_reason,  # converged | ceiling | floor | max_tasks | ""
+            "end_reason": self.end_reason,  # converged | ceiling | floor | max_tasks | no_effort | ""
             "converged": self.converged,
             # Display band derived from decide's thresholds (never stored twice).
             "band": [round(math.exp(decide.LOW_LOAD), 2), round(math.exp(decide.HIGH_LOAD), 2)],
             "baseline_sd": round(self.state.baseline_sd, 3),  # the patient's yardstick behind each z
+            "baseline_seconds": round(self.baseline_seconds),
+            "baseline_stable": self.baseline_stable,  # False = never settled; clinician judgement call
             "mean_rt": round(statistics.fmean(t.rt for t in answered), 1) if answered else None,
             "accuracy": round(sum(t.result == "correct" for t in h) / len(h), 2) if h else None,
             "disengaged_count": sum(t.flag for t in h),

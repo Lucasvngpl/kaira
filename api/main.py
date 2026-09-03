@@ -141,7 +141,9 @@ if __name__ == "__main__":
     parser.add_argument(
         "--synthetic",
         action=argparse.BooleanOptionalAction,
-        default=True,
+        # Inherit the env var (already applied above) so KAIRA_SYNTHETIC=0
+        # works on this launch path too; the flag still wins when passed.
+        default=stream.SYNTHETIC,
         help="synthetic board (default) vs real eego hardware",
     )
     parser.add_argument("--host", default="127.0.0.1")

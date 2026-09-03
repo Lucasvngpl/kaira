@@ -80,6 +80,17 @@ def run() -> None:
     assert "disengaged" not in first.flags and "disengaged" in second.flags
     assert first.quadrant == "disengaged" and first.reason == "repeat"
 
+    # 8. Three no-effort misses end the session with no level claim - and at
+    #    MIN they must read no_effort, not floor ("could not perform" would
+    #    be a lie about someone who was not trying). Two are not enough, and
+    #    an untrusted miss never counts toward the three.
+    assert d.should_end([T("incorrect", 3, LOW)] * 3) == (True, "no_effort", None)
+    assert d.should_end([T("incorrect", 1, LOW)] * 3) == (True, "no_effort", None)
+    assert d.should_end([T("incorrect", 3, LOW)] * 2)[0] is False
+    assert d.should_end(
+        [T("incorrect", 3, LOW), T("incorrect", 3, LOW), T("incorrect", 3, LOW, trusted=False)]
+    )[0] is False
+
     print("decide tests OK")
 
 

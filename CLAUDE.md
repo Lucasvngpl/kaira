@@ -7,8 +7,14 @@ Full brief: `~/Downloads/HANDOFF.md`. Setup and run commands: `README.md`.
 
 `python/stream.py`, `preprocess.py`, `features.py`, `decide.py` are HAND-WRITTEN by the team.
 The competition AI policy requires every line of the algorithm to be defensible on the spot, so Claude does not implement them beyond the existing skeletons unless Lucas explicitly says otherwise.
-(Standing exceptions, Lucas-approved: `features.py` is his hand-written implementation (2026-08-28, interface name `cognitive_load`), and `decide.py` was implemented 2026-08-31 from his written spec (`~/Downloads/decide_py_prompt.md`) - a six-cell table where only two cells use the EEG, plus termination via `should_end`.)
+(Standing exceptions, Lucas-approved: `features.py` is his hand-written implementation (2026-08-28, interface name `cognitive_load`), and `decide.py` was implemented 2026-08-31 from his written spec (`~/Downloads/decide_py_prompt.md`) - a six-cell table where only two cells use the EEG, plus termination via `should_end` (five endings: converged / ceiling / floor / no_effort / max_tasks; the no-effort ladder is 2 misses = disengaged flag, 3 = stop and ask for a redo).)
 Everything else (`session.py`, `tasks.py`, `api/`, `ui/`) is scaffold and fair game.
+
+## Judges read this repo line by line
+
+The AI policy means the team defends every line on stage.
+So all code, scaffold included, must read like a careful human wrote it: short humanized comments that say why, simple elegant flow, no boilerplate, no cleverness that needs a paragraph to excuse.
+Anything that smells generated is a liability in the room.
 
 ## The data is fake until the real pipeline lands
 
@@ -18,6 +24,7 @@ Everything else (`session.py`, `tasks.py`, `api/`, `ui/`) is scaffold and fair g
 - So "proper data to test with" arrives in two steps: first the offline validation of `features.cognitive_load` against those examples (still to run), then live closed-loop runs (synthetic board anywhere, the real amplifier on Windows).
 - Until then, never judge visuals or adaptive behaviour by the noise-driven values; verify wiring with injected values instead (`python/smoke_test.py`, four-quadrant section).
 - decide's thresholds are fixed log units, `LOW_LOAD`/`HIGH_LOAD` = +-0.30 (0.74x-1.35x), picked by the 2026-08-31 band-width sweep on the oddball recording (same right-level accuracy as +-0.405, more convergence, one task faster). One person's noise, so `calibrate_bands()` on real sessions stays the settled answer. With noise-driven load hovering at 1.0x, most demo tasks land mid: corrects climb, wrongs ease.
+- The pipeline is already natural-log end to end (2026-09-02 review): `cognitive_load` returns ln(theta)-ln(alpha), the baseline is subtracted in log space (== ln(current/baseline), the team doc's formula), thresholds are ln of a multiplier. The team doc still says T = ln(1.5) = 0.405; Lucas is updating it to the sweep's +-0.30.
 
 ## The z-score plumbing, in plain words
 
@@ -46,7 +53,7 @@ Everything else (`session.py`, `tasks.py`, `api/`, `ui/`) is scaffold and fair g
 - Keep both suites green: `.venv/bin/python python/smoke_test.py` and `.venv/bin/python tests/test_decide.py`.
 - The UI follows the UQwest staff house style (`~/Side-Projects/UEP/frontend`): plain CSS with tokens, DM Sans + Source Serif 4, hairline cards at 12px radius, `kr-`/`sn-`/`rp-` class prefixes, axios behind `src/api.js`, hand-rolled chart legends, why-comments everywhere.
 - Live load is polled at 4 Hz (matches the real pipeline's 250 ms window step); the run screen's 1-5 effort meter and every clinician sentence (`reason_text`) are computed server-side - the UI computes nothing.
-- The resting baseline is 180 s (team protocol, 2026-08-31): the patient does nothing for 3 minutes while the session learns their average load AND its wobble. Rehearse with `KAIRA_BASELINE_SECONDS=15` on the API; never shorten the constant itself.
+- The resting baseline is adaptive (team protocol, 2026-09-02): record at least 90 s, then stop as soon as the last two 30 s mean-CLI windows agree within 10% (a log distance, `session.BASELINE_TOLERANCE`), capped at 3 minutes. Never settles -> plain 3-minute average plus a `baseline_stable=false` flag (UI tells the clinician to check electrodes and consider redoing). Rehearse with `KAIRA_BASELINE_SECONDS=15`; overrides at or below 90 s skip the settling logic. Never shorten the constants themselves.
 - `http://localhost:5173/?demo=report` deep-links to the report screen with fabricated PT-SAMPLE data (`ui/src/sampleReport.js`) for UI work without running a session.
 - No em dashes anywhere, including UI copy and comments; use a plain dash.
 - Work happens on branches `lucas` and `aarnav`; changes to the fixed Python interface need both.
