@@ -46,12 +46,14 @@ body {
   padding: 18px 0 26px;
 }
 
+/* The KAIRA wordmark is an SVG (Inter, crossbar-less A's, always Deep Slate
+   - see App.jsx); height sets the size, overflow stays visible so the type
+   never clips if Inter renders a touch wider than the viewBox. */
 .kr-wordmark {
-  font-family: var(--font-serif);
-  font-size: 22px;
-  font-weight: 600;
-  letter-spacing: -0.01em;
-  color: var(--ink);
+  display: block;
+  height: 18px;
+  width: auto;
+  overflow: visible;
 }
 
 .kr-topbar__meta {
@@ -63,14 +65,14 @@ body {
   color: var(--text-secondary);
 }
 
-/* ---- Page header: serif title + muted sub --------------------------------- */
+/* ---- Page header: DM Sans title + muted sub -------------------------------- */
 
 .kr-header {
   margin-bottom: 1.75rem;
 }
 
 .kr-header h1 {
-  font-family: var(--font-serif);
+  font-family: var(--font-sans);
   font-size: 2.2rem;
   font-weight: 600;
   letter-spacing: -0.01em;
@@ -113,14 +115,15 @@ body {
   color: var(--ink);
 }
 
-/* Tinted count badge - the title says what, the count says how many. */
+/* Outlined count badge (brand: hairline ink outlines, never tinted fills). */
 .kr-badge {
   display: inline-flex;
   align-items: center;
-  padding: 3px 10px;
-  border-radius: 100px;
-  background: var(--fill);
-  color: var(--text-secondary);
+  padding: 3px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--ink);
+  background: transparent;
+  color: var(--ink);
   font-size: 12px;
   font-weight: 500;
   white-space: nowrap;
@@ -137,9 +140,9 @@ body {
   justify-content: center;
   gap: 7px;
   min-height: 38px;
-  padding: 0 16px;
+  padding: 0 18px;
   border: none;
-  border-radius: var(--radius-md);
+  border-radius: 999px; /* pill-shaped, per the brand's Neuralink-leaning restyle */
   background: var(--fill);
   color: var(--ink);
   font-size: 14px;
@@ -178,26 +181,25 @@ body {
   background: var(--accent-hover);
 }
 
-/* Outlined secondary */
+/* Outlined secondary: a thin ink-outline pill, transparent inside. */
 .kr-btn {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  padding: 8px 16px;
-  border-radius: var(--radius-md);
-  border: 1px solid var(--border-soft);
-  background: #fff;
+  padding: 8px 18px;
+  border-radius: 999px;
+  border: 1px solid var(--ink);
+  background: transparent;
   font-size: 13px;
-  font-weight: 600;
-  color: #334155;
+  font-weight: 500;
+  color: var(--ink);
   cursor: pointer;
   text-decoration: none;
-  transition: background 0.12s, border-color 0.12s, transform 0.14s var(--ease-out);
+  transition: background 0.12s, transform 0.14s var(--ease-out);
 }
 
 .kr-btn:hover {
-  background: #f8fafc;
-  border-color: var(--border-strong);
+  background: var(--bg-subtle);
 }
 
 .kr-btn:active {
@@ -215,17 +217,19 @@ body {
   height: 13px;
 }
 
-/* ---- Status pill: white fill, hairline, coloured dot ------------------------ */
+/* ---- Status pill: ink-outline pill, coloured dot ----------------------------
+   The outline is monochrome; only the DOT carries the status colour, so
+   results still always read the same without a coloured pill. */
 
 .kr-pill {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 3px 11px 4px;
+  padding: 3px 12px 4px;
   border-radius: 999px;
-  background: #fff;
-  color: #475569;
-  border: 1px solid #e1e1e1;
+  background: transparent;
+  color: var(--ink);
+  border: 1px solid var(--ink);
   font-size: 0.75rem;
   font-weight: 500;
   line-height: 1.3;
@@ -257,19 +261,17 @@ body {
   --pill-dot: var(--status-idle);
 }
 
-/* Soft-fill chip (no border) for live/system states, e.g. "Synthetic signal". */
+/* Live/system states, e.g. "Demo signal": a dot and plain text, no
+   container at all - metadata is marked, never boxed. */
 .kr-chip {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 3px 11px 4px;
-  border-radius: 999px;
-  font-size: 12px;
+  gap: 7px;
+  font-size: 12.5px;
   font-weight: 500;
   line-height: 1.5;
   white-space: nowrap;
-  background: var(--accent-soft);
-  color: #475569;
+  color: var(--ink);
 }
 
 .kr-chip::before {
@@ -282,7 +284,6 @@ body {
 }
 
 .kr-chip--warn {
-  background: #fdf1e3;
   --chip-dot: var(--status-warn);
 }
 

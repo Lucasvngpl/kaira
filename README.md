@@ -17,7 +17,7 @@ kaira/
 │   ├── features.py      cognitive load index (Welch theta/alpha)  [Lucas, hand-written]
 │   ├── decide.py        SKELETON - adaptive staircase             [Lucas]
 │   ├── session.py       orchestrator: one session's state and sequencing
-│   ├── tasks.py         task bank (Memory populated, levels 1-5)
+│   ├── tasks.py         task bank (Visuospatial populated, levels 1-5)
 │   ├── smoke_test.py    headless check of the whole loop
 │   └── requirements.txt
 ├── api/

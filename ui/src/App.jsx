@@ -5,6 +5,7 @@
 import { useState } from 'react';
 import { getRoot } from './api.js';
 import usePoll from './hooks/usePoll.js';
+import Wordmark from './components/Wordmark.jsx';
 import StartScreen from './components/StartScreen.jsx';
 import BaselineScreen from './components/BaselineScreen.jsx';
 import RunScreen from './components/RunScreen.jsx';
@@ -48,7 +49,7 @@ export default function App() {
   return (
     <div className="kr-page">
       <div className="kr-topbar">
-        <span className="kr-wordmark">Kaira</span>
+        <Wordmark />
         <div className="kr-topbar__meta">
           {session && (
             <span>
@@ -89,6 +90,7 @@ export default function App() {
         <BaselineScreen
           sessionId={session.id}
           seconds={session.baselineSeconds}
+          canSkip={info?.synthetic}
           onDone={(result) => {
             setBaseline(result);
             setPhase('run');

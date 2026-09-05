@@ -21,17 +21,18 @@ import '../styles/report.css';
 
 // Chart colours are JS-side constants (recharts props take literals); values
 // mirror the --chart-* tokens in tokens.css. One palette on purpose: bars are
-// a light tint of the staff green (a measurement, quiet), the level line is
-// the full accent (the decision path, loud), amber is reserved for flagged
-// no-effort answers, and the effort thresholds are neutral slate.
-const BAR = '#7bb095';
-const FLAG = '#f59e0b';
-const LINE = '#237a4e';
-// Axis text and lines in clean ink (DM Sans comes from the page cascade
-// plus the .rp-report .recharts-text rule): the sketch is a black pen
-// drawing, not a grey one.
-const TICK = '#0a1729';
-const AXIS = '#0a1729';
+// Neural Blue (the brand's measurement colour, quiet), the level line is
+// Deep Slate (the decision path draws in the same pen as the axes, loud),
+// and Warm Sand is reserved for flagged no-effort answers - the brand's
+// "sparingly" colour, which flags should be.
+const BAR = '#489fce';
+const FLAG = '#d8a66a';
+const LINE = '#263238';
+// Axis text and lines in the slate ink (DM Sans comes from the page cascade
+// plus the .rp-report .recharts-text rule): the sketch is a pen drawing,
+// not a grey one.
+const TICK = '#263238';
+const AXIS = '#263238';
 
 // Each way a session can end gets its own pill; "floor" must never look
 // like convergence.

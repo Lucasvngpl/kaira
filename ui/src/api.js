@@ -21,6 +21,10 @@ export const startSession = (patient_ref, domain) =>
 export const getBaselineStatus = (id) =>
   client.get(`/session/${id}/baseline-status`).then((r) => r.data);
 
+// Demo-only (400 on real hardware): ends the baseline immediately.
+export const skipBaseline = (id) =>
+  client.post(`/session/${id}/baseline-skip`).then((r) => r.data);
+
 export const getNextTask = (id) => client.get(`/session/${id}/next-task`).then((r) => r.data);
 
 export const postAnswer = (id, task_id, result, elapsed_seconds) =>

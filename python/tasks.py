@@ -5,15 +5,18 @@ verbatim (instructions plus stimulus) and the scoring criterion they check
 the patient's answer against. The patient never sees the screen, so the
 prompt carries the full administration script.
 
-Demo domain is Memory. Difficulty scales on classic memory-span grounds:
-digit spans run from 3 (well under typical adult span) to 7 forward /
-5 backward (at or past it), word lists from 3 to 8 items, and paired
-associates from 2 related pairs to 6 mostly unrelated ones - unrelated pairs
-are the standard "hard associates" manipulation. Backward span only appears
-from level 3 because it adds a manipulation cost on top of storage.
+Demo domain is Visuospatial. Its items are STAND-INS borrowed from memory
+testing (the team supplies the real visuospatial questions later; only the
+task text changes, none of the plumbing). The placeholder difficulty scales
+on classic memory-span grounds: digit spans run from 3 (well under typical
+adult span) to 7 forward / 5 backward (at or past it), word lists from 3 to
+8 items, and paired associates from 2 related pairs to 6 mostly unrelated
+ones - unrelated pairs are the standard "hard associates" manipulation.
+Backward span only appears from level 3 because it adds a manipulation cost
+on top of storage.
 
 Attention and Language exist as empty structures so the extension path is
-obvious, but only Memory is populated for the buildathon demo.
+obvious, but only Visuospatial is populated for the buildathon demo.
 """
 
 from __future__ import annotations
@@ -57,7 +60,7 @@ _PAIRS_ASK = ' Then say: "Now I give you the first word of each pair; tell me it
 
 def _words(task_id: str, level: int, items: str, count: int) -> Task:
     return Task(
-        id=task_id, domain="Memory", level=level, kind="word_list",
+        id=task_id, domain="Visuospatial", level=level, kind="word_list",
         prompt=_WORDS_INTRO + items + ".",
         answer=f"{items.lower().replace(' - ', ', ')} (any order, all {count} required)",
     )
@@ -68,7 +71,7 @@ def _digits(task_id: str, level: int, seq: str, backward: bool = False) -> Task:
     digits = seq.split(" - ")
     expected = " ".join(reversed(digits)) if backward else " ".join(digits)
     return Task(
-        id=task_id, domain="Memory", level=level,
+        id=task_id, domain="Visuospatial", level=level,
         kind="digit_span_backward" if backward else "digit_span",
         prompt=intro + seq + ".",
         answer=f"{expected} (exact order)",
@@ -80,7 +83,7 @@ def _pairs(task_id: str, level: int, pairs: list[tuple[str, str]]) -> Task:
     ask = " ... ".join(f"{a}?" for a, b in pairs)
     key = "; ".join(f"{a} -> {b.lower()}" for a, b in pairs)
     return Task(
-        id=task_id, domain="Memory", level=level, kind="paired_associates",
+        id=task_id, domain="Visuospatial", level=level, kind="paired_associates",
         prompt=_PAIRS_INTRO + read + "." + _PAIRS_ASK + ask,
         answer=f"{key} (all {len(pairs)} required, any order of pairs)",
     )
@@ -132,7 +135,9 @@ _ATTENTION: dict[int, list[Task]] = {}
 _LANGUAGE: dict[int, list[Task]] = {}
 
 BANK: dict[str, dict[int, list[Task]]] = {
-    "Memory": _MEMORY,
+    # _MEMORY keeps its honest name: these ARE memory items, standing in
+    # under Visuospatial until the team's real question set replaces them.
+    "Visuospatial": _MEMORY,
     "Attention": _ATTENTION,
     "Language": _LANGUAGE,
 }

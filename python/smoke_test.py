@@ -33,13 +33,16 @@ def run() -> None:
     # --- real-pipeline sanity: noise through the hand-written load index ----
     value = features.cognitive_load(stream.get_window(2.0), stream.fs, stream.ch_names)
     assert isinstance(value, float) and math.isfinite(value)
-    s0 = session_mod.begin("PT-TEST0", "Memory")
+    s0 = session_mod.begin("PT-TEST0", "Visuospatial")
     time.sleep(0.35)
     s0.baseline_status()
     s0.next_task()
     live0 = s0.live_load()
     assert live0["trusted"] and 0.5 < live0["load"] < 2.0, "white-noise load should hover near baseline"
     assert 1 <= live0["bars"] <= 5, "live meter must be server-computed"
+    spec = live0["spectrum"]
+    assert len(spec["freqs"]) == len(spec["frontal"]) == len(spec["parietal"]) > 0
+    assert spec["freqs"][0] >= 2.0 and spec["freqs"][-1] <= 20.0, "spectrum shows the 2-20 Hz story"
     assert s0.state.baseline_sd >= session_mod.BASELINE_SD_FLOOR, "baseline must yield a usable SD"
 
     # From here scenarios need exact effort bands, so inject the load and let
@@ -50,7 +53,7 @@ def run() -> None:
     features.cognitive_load = lambda window, fs, ch_names: current[0]
 
     def begin_calibrated(ref):
-        s = session_mod.begin(ref, "Memory")
+        s = session_mod.begin(ref, "Visuospatial")
         current[0] = 0.0  # flat baseline -> mean 0.0, SD floored
         time.sleep(0.35)
         s.baseline_status()
@@ -157,7 +160,7 @@ def run() -> None:
         session_mod.BASELINE_SECONDS = 180.0  # real protocol, fake clock
         try:
             current[0] = 0.0  # steady signal: should settle right at the 90 s minimum
-            s6 = session_mod.begin("PT-TEST6", "Memory")
+            s6 = session_mod.begin("PT-TEST6", "Visuospatial")
             for tick in range(1, 91):
                 Clock.t = float(tick)
                 st = s6.baseline_status()
@@ -166,7 +169,7 @@ def run() -> None:
             assert rep6["baseline_stable"] and rep6["baseline_seconds"] == 90
 
             Clock.t = 0.0  # drifting signal: never settles, cap + flag
-            s7 = session_mod.begin("PT-TEST7", "Memory")
+            s7 = session_mod.begin("PT-TEST7", "Visuospatial")
             for tick in range(1, 181):
                 Clock.t = float(tick)
                 current[0] = tick * 0.01  # 0.3 drift per 30 s window, above tolerance

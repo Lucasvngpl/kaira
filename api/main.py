@@ -112,6 +112,14 @@ def baseline_status(session_id: str) -> dict:
     return _get(session_id).baseline_status()
 
 
+@app.post("/session/{session_id}/baseline-skip")
+def baseline_skip(session_id: str) -> dict:
+    # Demo-only: a real patient's baseline is protocol, not a waiting screen.
+    if not stream.SYNTHETIC:
+        raise HTTPException(status_code=400, detail="baseline skip is only available on the synthetic board")
+    return _get(session_id).skip_baseline()
+
+
 @app.get("/session/{session_id}/next-task")
 def next_task(session_id: str) -> dict:
     return _get(session_id).next_task()

@@ -6,13 +6,13 @@ import '../styles/session.css';
 
 export default function StartScreen({ info, onStarted }) {
   const [patientRef, setPatientRef] = useState('');
-  const [domain, setDomain] = useState('Memory');
+  const [domain, setDomain] = useState('Visuospatial');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
   // Until GET / answers, offer the one domain we know is populated rather
   // than an empty select.
-  const domains = info ? Object.entries(info.domains) : [['Memory', true]];
+  const domains = info ? Object.entries(info.domains) : [['Visuospatial', true]];
 
   const submit = async (e) => {
     e.preventDefault();

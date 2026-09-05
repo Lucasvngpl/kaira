@@ -2,25 +2,29 @@
 // Every poll also lets the backend take a baseline load sample, so polling
 // here is part of the measurement, not just cosmetics.
 import { useRef, useState } from 'react';
-import { getBaselineStatus } from '../api.js';
+import { getBaselineStatus, skipBaseline } from '../api.js';
 import usePoll from '../hooks/usePoll.js';
 import '../styles/session.css';
 
-export default function BaselineScreen({ sessionId, seconds, onDone }) {
+export default function BaselineScreen({ sessionId, seconds, canSkip, onDone }) {
   const [progress, setProgress] = useState(0);
   const firedRef = useRef(false); // onDone must fire once, not once per poll
+
+  // Hand the outcome up: how long it really ran, and whether the signal
+  // ever settled (RunScreen warns the clinician when not).
+  const finish = (st) => {
+    if (!firedRef.current) {
+      firedRef.current = true;
+      onDone({ stable: st.stable, seconds: st.seconds });
+    }
+  };
 
   usePoll(
     async () => {
       try {
         const st = await getBaselineStatus(sessionId);
         setProgress(st.progress);
-        if (st.done && !firedRef.current) {
-          firedRef.current = true;
-          // Hand the outcome up: how long it really ran, and whether the
-          // signal ever settled (RunScreen warns the clinician when not).
-          onDone({ stable: st.stable, seconds: st.seconds });
-        }
+        if (st.done) finish(st);
       } catch {
         // A missed poll keeps the last painted progress; the next one catches up.
       }
@@ -28,6 +32,14 @@ export default function BaselineScreen({ sessionId, seconds, onDone }) {
     1000,
     true
   );
+
+  const skip = async () => {
+    try {
+      finish(await skipBaseline(sessionId));
+    } catch {
+      // Not fatal (e.g. real hardware refuses); the normal poll keeps going.
+    }
+  };
 
   const remaining = Math.max(0, Math.ceil(seconds * (1 - progress)));
   // "About 2:54 left" reads better than "About 174 s left" now that the
@@ -53,6 +65,13 @@ export default function BaselineScreen({ sessionId, seconds, onDone }) {
         </p>
         {/* Only the real protocol adapts; short rehearsal baselines just run out. */}
         {seconds > 90 && <p className="kr-hint">Ends early once the signal settles.</p>}
+        {/* Demo-only escape hatch for UI testing; the server refuses it on
+            real hardware, so a patient session can never lose its baseline. */}
+        {canSkip && (
+          <button className="kr-btn" onClick={skip}>
+            Skip baseline (demo)
+          </button>
+        )}
       </div>
     </div>
   );

@@ -1,16 +1,24 @@
-/* Design tokens, carried over from the UQwest staff surface (tokens.css there).
-   Kaira is a clinician-facing tool, so it takes the STAFF accent (green), not
-   the student blue. Values are verbatim UQwest unless commented. */
+/* Design tokens. Structure carried over from the UQwest staff surface;
+   values are the Kaira brand system (team, 2026-09-05): mostly white +
+   Deep Slate, Neural Blue / Adaptive Green as accents, Warm Sand sparingly. */
 :root {
-  /* --- Accent ---------------------------------------------------------- */
-  --accent: #237a4e;
-  --accent-rgb: 35, 122, 78;
-  --accent-hover: #1b5e3b;
-  --accent-soft: #e4f2ea;
-  --accent-border: #bfe0cc;
+  /* --- Accent: actions and decisions read in Deep Slate ----------------- */
+  --accent: #263238;
+  --accent-rgb: 38, 50, 56;
+  --accent-hover: #1a2329;
+  --accent-soft: #eaf3f5; /* Cool Mist */
+  --accent-border: #cfe0e6;
 
-  /* --- Ink / text ------------------------------------------------------ */
-  --ink: #0a1729;
+  /* --- Signal: anything showing the LIVE measurement is Neural Blue,
+     so "what the EEG says" and "what the system does" never share a colour. */
+  --signal: #489fce;
+  --signal-rgb: 72, 159, 206;
+  /* Adaptive Green: reserved for the parietal-alpha half of the spectrum. */
+  --adaptive: #87cc9a;
+  --adaptive-rgb: 135, 204, 154;
+
+  /* --- Ink / text (Deep Slate doubles as the ink) ----------------------- */
+  --ink: #263238;
   --text-secondary: #5c6378;
   --text-tertiary: #8a8fa3;
 
@@ -30,17 +38,18 @@
   --status-idle: #94a3b8;
 
   /* --- Chart ------------------------------------------------------------
-     Load bars are a MEASUREMENT, not a status, so they get a cool neutral
-     blue from the UQwest spectrum. Flagged bars go amber (caution, not
-     error). The level line takes the accent, per the house trend-line rule. */
-  --chart-bar: #3b82f6;
-  --chart-flag: #f59e0b;
-  --chart-line: var(--accent);
+     Load bars are a MEASUREMENT, so they take Neural Blue; the level line
+     is the decision path and draws in the same slate pen as the axes;
+     flagged bars go Warm Sand (caution, not error - and sand is the brand's
+     "sparingly" colour, which flags should be). */
+  --chart-bar: var(--signal);
+  --chart-flag: #d8a66a;
+  --chart-line: var(--ink);
   --chart-grid: #e6e9ee;
   --chart-tick: #64748b;
 
-  /* --- Typography ------------------------------------------------------ */
-  --font-serif: 'Source Serif 4', Georgia, 'Times New Roman', serif;
+  /* --- Typography: DM Sans everywhere; the KAIRA wordmark is drawn SVG
+     paths (Wordmark.jsx), not type ----------------------------------------- */
   --font-sans: 'DM Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
 
   /* --- Radius / shadow -------------------------------------------------- */

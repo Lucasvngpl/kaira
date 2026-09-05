@@ -25,7 +25,7 @@
 }
 
 .sn-baseline__title {
-  font-family: var(--font-serif);
+  font-family: var(--font-sans);
   font-size: 1.35rem;
   font-weight: 600;
   margin: 0 0 6px;
@@ -50,7 +50,7 @@
   display: block;
   height: 100%;
   border-radius: 999px;
-  background: var(--accent);
+  background: var(--signal); /* a recording in progress is signal, not action */
   /* Polls land once a second; easing between them keeps the bar from
      visibly stepping. This tracks real samples, it is not a fake delay. */
   transition: width 0.6s ease;
@@ -67,8 +67,9 @@
 
 .sn-run__grid {
   display: grid;
-  /* Task card dominates; the load readout is a sidecar, not a co-star. */
-  grid-template-columns: minmax(0, 1fr) 300px;
+  /* Task card dominates; the signal column is a sidecar - but it is the
+     demo star while a task runs, so it gets enough width to read. */
+  grid-template-columns: minmax(0, 1fr) 340px;
   gap: 18px;
   align-items: start;
 }
@@ -76,6 +77,12 @@
 @media (max-width: 900px) {
   .sn-run__grid {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  /* Stacked below the task card, the column rule makes no sense. */
+  .sn-load {
+    border-left: 0;
+    padding-left: 0;
   }
 }
 
@@ -171,14 +178,25 @@
   padding: 0 18px 18px;
 }
 
-/* ---- Live load card ---------------------------------------------------------- */
+/* ---- Live signal column -------------------------------------------------------
+   Deliberately NOT a card: the task card is the object being administered,
+   but the signal readout is ambient telemetry - a hairline and air, no box. */
+
+.sn-load {
+  border-left: 1px solid var(--border-soft);
+  padding-left: 22px;
+}
+
+.sn-load .kr-card__head {
+  padding: 2px 0 10px;
+}
 
 .sn-load__body {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
   gap: 10px;
-  padding: 4px 18px 18px;
+  padding: 0;
 }
 
 .sn-load__value {
@@ -226,7 +244,7 @@
 }
 
 .sn-meter__seg--on {
-  background: var(--accent);
+  background: var(--signal); /* the meter shows a measurement */
 }
 
 /* ---- Live sparkline ---------------------------------------------------------- */
@@ -252,7 +270,10 @@
 
 .sn-spark__line {
   fill: none;
-  stroke: var(--accent);
+  /* Slate, not signal blue: the sparkline is the load - the OUTPUT of the
+     formula - so it pairs with the big slate number above it, while
+     blue/green stays reserved for the raw bands in the spectrum. */
+  stroke: var(--ink);
   stroke-width: 1.5;
 }
 
@@ -271,7 +292,7 @@
   gap: 7px;
   font-size: 12px;
   font-weight: 600;
-  color: var(--accent);
+  color: var(--signal);
 }
 
 .sn-load__live::before {
@@ -279,19 +300,19 @@
   width: 8px;
   height: 8px;
   border-radius: 999px;
-  background: var(--accent);
+  background: var(--signal);
   animation: sn-pulse 1.4s ease-out infinite;
 }
 
 @keyframes sn-pulse {
   0% {
-    box-shadow: 0 0 0 0 rgba(35, 122, 78, 0.35);
+    box-shadow: 0 0 0 0 rgba(var(--signal-rgb), 0.35);
   }
   70% {
-    box-shadow: 0 0 0 9px rgba(35, 122, 78, 0);
+    box-shadow: 0 0 0 9px rgba(var(--signal-rgb), 0);
   }
   100% {
-    box-shadow: 0 0 0 0 rgba(35, 122, 78, 0);
+    box-shadow: 0 0 0 0 rgba(var(--signal-rgb), 0);
   }
 }
 
@@ -308,6 +329,133 @@
   line-height: 1.5;
   color: var(--text-tertiary);
   text-wrap: pretty;
+}
+
+/* ---- Live periodogram: the load formula, drawn -------------------------------
+   Frontal curve + theta shading in signal blue, parietal curve + alpha
+   shading in adaptive green. Separated from the sparkline by a hairline,
+   not a box. */
+
+.sn-psd {
+  width: 100%;
+  margin: 6px 0 0;
+  padding-top: 12px;
+  border-top: 1px solid var(--hairline);
+}
+
+.sn-psd svg {
+  width: 100%;
+  height: 96px;
+  display: block;
+}
+
+.sn-psd--paused {
+  opacity: 0.45;
+}
+
+.sn-psd__line {
+  fill: none;
+  stroke-width: 1.5;
+}
+
+.sn-psd__line--frontal {
+  stroke: var(--signal);
+}
+
+.sn-psd__line--parietal {
+  stroke: var(--adaptive);
+}
+
+.sn-psd__band--theta {
+  fill: rgba(var(--signal-rgb), 0.22);
+}
+
+.sn-psd__band--alpha {
+  fill: rgba(var(--adaptive-rgb), 0.3);
+}
+
+.sn-psd__axis {
+  position: relative;
+  height: 26px;
+  font-size: 10.5px;
+  color: var(--text-tertiary);
+}
+
+.sn-psd__tick {
+  position: absolute;
+  top: 12px;
+  transform: translateX(-50%);
+  font-variant-numeric: tabular-nums;
+}
+
+.sn-psd__tick--unit {
+  right: 0;
+  transform: none;
+}
+
+/* The band letters sit above the edge numbers, in their band's own colour. */
+.sn-psd__glyph {
+  position: absolute;
+  top: 0;
+  transform: translateX(-50%);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.sn-psd__glyph--theta {
+  color: var(--signal);
+}
+
+.sn-psd__glyph--alpha {
+  color: var(--adaptive);
+}
+
+.sn-psd__legend {
+  display: flex;
+  gap: 14px;
+  margin: 2px 0 0;
+  font-size: 12.5px;
+  color: var(--text-secondary);
+}
+
+.sn-psd__dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  margin-right: 4px;
+}
+
+.sn-psd__dot--frontal {
+  background: var(--signal);
+}
+
+.sn-psd__dot--parietal {
+  background: var(--adaptive);
+}
+
+/* The formula is the demo punchline - readable, not the faintest text. */
+.sn-psd__formula {
+  margin: 6px 0 0;
+  font-size: 12.5px;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Micro-label naming each chart: letterspaced caps, no box - the difference
+   between "two wiggly graphs" and "history + evidence". */
+.sn-chartlabel {
+  margin: 10px 0 0;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+
+/* Inside the spectrum figure the hairline already provides the separation. */
+.sn-psd .sn-chartlabel {
+  margin: 0 0 8px;
 }
 
 /* ---- Task skeleton ------------------------------------------------------------ */

@@ -46,13 +46,23 @@ Anything that smells generated is a liability in the room.
   - Juras, Hromatko and Vranic 2025, Front Aging Neurosci (PMID 40182761): parietal alpha and theta power predict cognitive training gains in middle-aged adults - supports the aging/decline framing.
 - Worked EEG notebooks: github.com/Ildaron/EEG-Signal-Processing-with-Python (band-pass, artefact analysis, real-time processing examples the team can crib from by hand).
 
+## Brand system (team, 2026-09-05)
+
+- KAIRA - "Where the brain guides what's next." Essence: Sense -> Understand -> Adapt -> Progress. Personality: intelligent, human, calm, adaptive, forward.
+- Colors: Deep Slate `#263238` (ink AND primary actions), Neural Blue `#489fce` (anything showing the live measurement), Adaptive Green `#87cc9a` (the parietal-alpha half of the live spectrum), Cool Mist `#EAF3F5` (soft surfaces), Warm Sand `#D8A66A` (flags only - the "sparingly" colour). Mostly white + slate; blue/green are the accents.
+- Status colors (good/warn/bad) stay un-themed - a result must always read the same.
+- Typography: DM Sans for all text (no serif anywhere). The KAIRA wordmark is drawn SVG paths (`ui/src/components/Wordmark.jsx`), recreated from the brand slide: thin geometric caps, wide tracking, crossbar-less A's, always Deep Slate. Slides pair it with Inter, but the UI loads no second font.
+- Graphic language: circle + pulse + direction (closed loop, neural signal, adaptation). Diagrams show signals converging -> insight -> adaptation.
+- UI mapping: `--accent` = slate (buttons, focus, decisions), `--signal` = Neural Blue (live pulse, effort meter, baseline progress, chart bars, spectrum frontal curve); the load sparkline is slate - the formula OUTPUT pairs with the slate number, blue/green stay the raw bands, chart level line = slate pen, flagged bars = Warm Sand.
+
 ## Conventions
 
 - API on `127.0.0.1:8300` (8000 collides with Django dev servers). UI is Vite on 5173; CORS is pinned to that port.
 - Restart the API after editing `python/` (it does not run with --reload).
 - Keep both suites green: `.venv/bin/python python/smoke_test.py` and `.venv/bin/python tests/test_decide.py`.
-- The UI follows the UQwest staff house style (`~/Side-Projects/UEP/frontend`): plain CSS with tokens, DM Sans + Source Serif 4, hairline cards at 12px radius, `kr-`/`sn-`/`rp-` class prefixes, axios behind `src/api.js`, hand-rolled chart legends, why-comments everywhere.
+- The UI follows the UQwest staff house STRUCTURE (`~/Side-Projects/UEP/frontend`): plain CSS with tokens, hairline cards at 12px radius, `kr-`/`sn-`/`rp-` class prefixes, axios behind `src/api.js`, hand-rolled chart legends, why-comments everywhere. Colors and type come from the Kaira brand system above, not from UQwest.
 - Live load is polled at 4 Hz (matches the real pipeline's 250 ms window step); the run screen's 1-5 effort meter and every clinician sentence (`reason_text`) are computed server-side - the UI computes nothing.
+- The live periodogram (frontal theta blue, parietal alpha green, 2-20 Hz) rides the live-load response; `session._spectrum` mirrors features.py's Welch settings without touching the hand-written file, and the decision never reads it - display only. The signal column is deliberately not a card.
 - The resting baseline is adaptive (team protocol, 2026-09-02): record at least 90 s, then stop as soon as the last two 30 s mean-CLI windows agree within 10% (a log distance, `session.BASELINE_TOLERANCE`), capped at 3 minutes. Never settles -> plain 3-minute average plus a `baseline_stable=false` flag (UI tells the clinician to check electrodes and consider redoing). Rehearse with `KAIRA_BASELINE_SECONDS=15`; overrides at or below 90 s skip the settling logic. Never shorten the constants themselves.
 - `http://localhost:5173/?demo=report` deep-links to the report screen with fabricated PT-SAMPLE data (`ui/src/sampleReport.js`) for UI work without running a session.
 - No em dashes anywhere, including UI copy and comments; use a plain dash.

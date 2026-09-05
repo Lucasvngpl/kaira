@@ -87,10 +87,10 @@
 }
 
 .rp-card__title {
-  font-family: var(--font-serif);
+  font-family: var(--font-sans);
   font-size: 1.15rem;
   font-weight: 600;
-  color: #0f172a;
+  color: var(--ink);
   margin: 0 0 0.15rem;
 }
 
@@ -137,7 +137,7 @@
 
 .rp-card__ctrl:hover {
   background: #f4f5f8;
-  color: #0f172a;
+  color: var(--ink);
   border-color: #cbd5e1;
 }
 
@@ -339,7 +339,7 @@
 
 .rp-modal__close:hover {
   background: #f4f5f8;
-  color: #0f172a;
+  color: var(--ink);
   border-color: #cbd5e1;
 }
 

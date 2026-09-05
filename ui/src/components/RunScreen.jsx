@@ -8,6 +8,7 @@ import { useEffect, useRef, useState } from 'react';
 import { FiArrowRight, FiCheck, FiClock, FiPlay, FiX } from 'react-icons/fi';
 import { getLiveLoad, getNextTask, postAnswer, errorText, isConflict } from '../api.js';
 import usePoll from '../hooks/usePoll.js';
+import Periodogram from './Periodogram.jsx';
 import '../styles/session.css';
 
 const RESULT_COPY = { correct: 'Marked right', incorrect: 'Marked wrong', timeout: 'Marked timeout' };
@@ -280,7 +281,9 @@ export default function RunScreen({ session, baseline, band = [0.74, 1.35], onFi
           )}
         </section>
 
-        <section className="kr-card sn-load">
+        {/* Not a card on purpose: the signal column is ambient telemetry,
+            held by a hairline and air rather than a box. */}
+        <section className="sn-load">
           <div className="kr-card__head">
             <h2 className="kr-cardtitle">Cognitive load</h2>
             {/* While the stopwatch runs this number IS the EEG doing
@@ -314,7 +317,15 @@ export default function RunScreen({ session, baseline, band = [0.74, 1.35], onFi
               <p className="kr-hint">Updates once the task starts.</p>
             )}
             {samples.length > 1 && (
-              <LoadSparkline samples={samples} band={band} paused={stage !== 'running'} />
+              <>
+                <p className="sn-chartlabel">Load &middot; last 30 s</p>
+                <LoadSparkline samples={samples} band={band} paused={stage !== 'running'} />
+              </>
+            )}
+            {/* The formula, drawn live: judges see the theta and alpha the
+                load number integrates, from the exact channel groups. */}
+            {live?.spectrum && (
+              <Periodogram spectrum={live.spectrum} paused={stage !== 'running'} />
             )}
             <p className="sn-load__explain">
               How hard the brain is working right now, relative to this patient's own resting

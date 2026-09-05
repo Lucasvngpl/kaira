@@ -27,6 +27,8 @@ import uuid
 from dataclasses import dataclass, field
 from datetime import date
 
+from scipy import signal
+
 import decide
 import features
 import preprocess
@@ -51,6 +53,13 @@ BASELINE_TOLERANCE = math.log(1.10)
 # Window length per load sample. 2 s gives the (future, real) Welch estimate
 # enough samples at 512 Hz for stable low-frequency bands.
 SAMPLE_SECONDS = 2.0
+
+# The live spectrum shown to judges: display plumbing only, the decision
+# never reads it. 2-20 Hz because theta (4-8) and alpha (8-12) are the whole
+# story; below 2 Hz residual drift and 1/f power dominate the y-scale and
+# squash the bands of interest.
+SPECTRUM_MIN_HZ = 2.0
+SPECTRUM_MAX_HZ = 20.0
 
 # All decision policy (start level, task cap, thresholds, termination) lives
 # in decide.py - session only holds state and applies Decisions mechanically.
@@ -115,7 +124,7 @@ class Session:
         if domain not in tasks.domains():
             raise ValueError(f"unknown domain: {domain!r}")
         if not tasks.has_tasks(domain):
-            raise ValueError(f"domain {domain!r} has no tasks yet (only Memory is populated)")
+            raise ValueError(f"domain {domain!r} has no tasks yet (only Visuospatial is populated)")
         self.id = uuid.uuid4().hex[:12]
         self.patient_ref = patient_ref
         self.date = date.today().isoformat()
@@ -137,11 +146,34 @@ class Session:
 
     # --- signal sampling ----------------------------------------------------
 
+    def _clean_window(self):
+        """One cleaned window off the stream, with its trust verdict."""
+        window = stream.get_window(SAMPLE_SECONDS)
+        return preprocess.clean(window, stream.fs, stream.ch_names)
+
     def _sample(self) -> tuple[float, bool]:
         """One absolute load reading through the (stub) signal chain."""
-        window = stream.get_window(SAMPLE_SECONDS)
-        cleaned, trusted = preprocess.clean(window, stream.fs, stream.ch_names)
+        cleaned, trusted = self._clean_window()
         return features.cognitive_load(cleaned, stream.fs, stream.ch_names), trusted
+
+    def _spectrum(self, cleaned) -> dict:
+        """Mean PSD of the frontal and parietal channel groups, for the live
+        periodogram. Mirrors features.py's Welch settings exactly (2 s
+        segments, 50% overlap) so the curve judges see is the same estimate
+        the load index integrates."""
+        seg = min(int(stream.fs * 2.0), cleaned.shape[1])
+        freqs, psd = signal.welch(cleaned, fs=stream.fs, nperseg=seg, noverlap=seg // 2, axis=1)
+        keep = (freqs >= SPECTRUM_MIN_HZ) & (freqs <= SPECTRUM_MAX_HZ)
+
+        def group_mean(names):
+            idx = [stream.ch_names.index(c) for c in names if c in stream.ch_names]
+            return [round(float(v), 5) for v in psd[idx][:, keep].mean(axis=0)] if idx else []
+
+        return {
+            "freqs": [float(f) for f in freqs[keep]],
+            "frontal": group_mean(features.FRONTAL),
+            "parietal": group_mean(features.PARIETAL),
+        }
 
     def _relative(self, load_log_abs: float) -> tuple[float, float]:
         """(load_log, multiple) of an absolute reading vs this patient's baseline."""
@@ -199,6 +231,16 @@ class Session:
         self.baseline_stable = stable
         self._baseline_done = True
 
+    def skip_baseline(self) -> dict:
+        """Demo shortcut: end the baseline now with whatever has been sampled.
+
+        The API only exposes this on the synthetic board - a real patient's
+        baseline is protocol, not a waiting screen.
+        """
+        if not self._baseline_done:
+            self._finalize_baseline(time.monotonic() - self._baseline_t0, stable=True)
+        return self.baseline_status()
+
     def _require_baseline(self) -> None:
         # Tolerate clients that slept through the baseline without polling.
         # No polls means no settling verdict, so no instability flag either.
@@ -247,7 +289,8 @@ class Session:
         recorded load is the mean of what was measured while the patient
         actually worked on it, not one lucky window at submit time.
         """
-        value, trusted = self._sample()
+        cleaned, trusted = self._clean_window()
+        value = features.cognitive_load(cleaned, stream.fs, stream.ch_names)
         if self._baseline_done:
             if self._current is not None:
                 self._task_samples.append((value, trusted))
@@ -260,7 +303,12 @@ class Session:
         # The 1-5 meter is server-computed from decide's own constants; the
         # UI renders it and computes nothing.
         bars = decide.load_bars(math.log(multiple)) if trusted else None
-        return {"load": round(multiple, 2), "trusted": trusted, "bars": bars}
+        return {
+            "load": round(multiple, 2),
+            "trusted": trusted,
+            "bars": bars,
+            "spectrum": self._spectrum(cleaned),
+        }
 
     def submit_answer(self, task_id: str, result: str, elapsed_seconds: float) -> dict:
         """Record the clinician's verdict, let decide.py act on it, apply the action."""

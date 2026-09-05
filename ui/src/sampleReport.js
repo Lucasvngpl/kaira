@@ -5,7 +5,7 @@
 // miss (second one flagged disengaged), an ease, then three high-effort
 // holds that converge at level 3.
 export const SAMPLE_REPORT = {
-  domain: 'Memory',
+  domain: 'Visuospatial',
   patient_ref: 'PT-SAMPLE',
   date: '2026-09-13',
   final_level: 3,
