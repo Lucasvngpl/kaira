@@ -62,7 +62,7 @@ export default function App() {
               whatever mode the API happens to be in while viewing it. */}
           {info?.synthetic && phase !== 'report' && (
             <span
-              className="kr-chip kr-chip--warn"
+              className="kr-chip kr-chip--demo"
               title="Numbers come from generated noise, not a patient. Disappears when a real amplifier is connected."
             >
               Demo signal

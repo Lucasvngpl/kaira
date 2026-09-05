@@ -16,6 +16,8 @@
   /* Adaptive Green: reserved for the parietal-alpha half of the spectrum. */
   --adaptive: #87cc9a;
   --adaptive-rgb: 135, 204, 154;
+  /* Warm Sand: the brand's "sparingly" colour - flags and provenance marks. */
+  --sand: #d8a66a;
 
   /* --- Ink / text (Deep Slate doubles as the ink) ----------------------- */
   --ink: #263238;
@@ -43,7 +45,7 @@
      flagged bars go Warm Sand (caution, not error - and sand is the brand's
      "sparingly" colour, which flags should be). */
   --chart-bar: var(--signal);
-  --chart-flag: #d8a66a;
+  --chart-flag: var(--sand);
   --chart-line: var(--ink);
   --chart-grid: #e6e9ee;
   --chart-tick: #64748b;

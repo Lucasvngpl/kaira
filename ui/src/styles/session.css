@@ -161,6 +161,11 @@
   gap: 6px;
 }
 
+/* Air between the effort readout and the Next button. */
+.sn-outcome .sn-meter {
+  margin: 2px 0 12px;
+}
+
 .sn-outcome__headline {
   margin: 0;
   font-size: 15px;

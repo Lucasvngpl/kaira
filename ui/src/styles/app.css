@@ -287,6 +287,12 @@ body {
   --chip-dot: var(--status-warn);
 }
 
+/* Provenance, not a warning: the demo-mode mark takes brand sand, so the
+   true amber stays reserved for things actually going wrong. */
+.kr-chip--demo {
+  --chip-dot: var(--sand);
+}
+
 /* ---- Form fields ------------------------------------------------------------ */
 
 .kr-field {

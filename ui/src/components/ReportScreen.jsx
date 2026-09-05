@@ -426,7 +426,7 @@ export default function ReportScreen({ sessionId, onNewSession, demo = false }) 
         <Kpi label="Accuracy" sub={`${nCorrect} of ${tasks.length} tasks right`}>
           <CountUp value={Math.round(report.accuracy * 100)} suffix="%" />
         </Kpi>
-        <Kpi label="Avg time to answer" sub="Timeouts excluded">
+        <Kpi label="Average time to answer" sub="Timeouts excluded">
           {report.mean_rt == null ? 'Not measured' : <CountUp value={report.mean_rt} decimals={1} suffix=" s" />}
         </Kpi>
         <Kpi
