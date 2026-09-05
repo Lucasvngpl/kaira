@@ -205,6 +205,16 @@ export default function ReportScreen({ sessionId, onNewSession, demo = false }) 
   const [error, setError] = useState('');
   const [expanded, setExpanded] = useState(false);
 
+  // Whole-report download as a real PDF: the browser's print pipeline gives
+  // vector text and clean pagination for free (print rules in report.css
+  // strip the chrome). The title becomes the suggested filename.
+  const downloadReport = () => {
+    const prev = document.title;
+    document.title = `kaira-report-${report.patient_ref}-${report.date}`;
+    window.print();
+    document.title = prev;
+  };
+
   useEffect(() => {
     if (demo) {
       setReport(SAMPLE_REPORT); // ?demo=report: fabricated PT-SAMPLE data, no session behind it
@@ -273,8 +283,10 @@ export default function ReportScreen({ sessionId, onNewSession, demo = false }) 
           fontSize: 11,
           fontWeight: 700,
           fill: LINE,
-          stroke: '#ffffff',
-          strokeWidth: 3,
+          // Just enough halo to lift the numeral off a bar - a heavy
+          // outline reads as a sticker.
+          stroke: 'rgba(255, 255, 255, 0.75)',
+          strokeWidth: 1.5,
           paintOrder: 'stroke',
         }}
       >
@@ -375,9 +387,15 @@ export default function ReportScreen({ sessionId, onNewSession, demo = false }) 
             {report.domain} · {report.patient_ref} · {report.date} · {tasks.length} tasks
           </p>
         </div>
-        <button className="kr-btn" onClick={onNewSession}>
-          New session
-        </button>
+        <div className="rp-header__actions">
+          <button className="kr-btn" onClick={downloadReport}>
+            <FiDownload aria-hidden="true" />
+            Download PDF
+          </button>
+          <button className="kr-btn" onClick={onNewSession}>
+            New session
+          </button>
+        </div>
       </header>
 
       {report.baseline_stable === false && (

@@ -9,6 +9,11 @@
   flex-wrap: wrap;
 }
 
+.rp-header__actions {
+  display: flex;
+  gap: 8px;
+}
+
 .rp-flagnote {
   margin: 0 0 1.25rem;
   /* Chips are inline-flex; as a callout this one is a block-level sentence. */
@@ -152,12 +157,10 @@
 
 /* ---- Task table ------------------------------------------------------------------ */
 
-/* Not a card: the record sits directly on the page under a hairline, like a
-   document section - the rows' own separators are all the structure a table
-   needs. */
+/* Not a card: the record sits directly on the page - the heading and the
+   rows' own separators are all the structure a table needs. */
 .rp-tablecard {
-  border-top: 1px solid var(--hairline);
-  margin-top: 6px;
+  margin-top: 10px;
 }
 
 .rp-tablecard .kr-card__head {
@@ -186,7 +189,7 @@
   text-align: left;
   font-size: 12px;
   font-weight: 500;
-  color: #6b7280;
+  color: var(--text-secondary);
   letter-spacing: 0.01em;
   border-bottom: 1px solid var(--hairline);
   white-space: nowrap;
@@ -201,7 +204,7 @@
   vertical-align: middle;
   text-align: left;
   font-size: 0.92rem;
-  color: #1f2937;
+  color: var(--ink);
 }
 
 .rp-table tbody tr:last-child td {
@@ -210,7 +213,7 @@
 
 /* Flagged rows carry a faint amber wash; the chip says why. */
 .rp-row--flag td {
-  background: rgba(245, 158, 11, 0.06);
+  background: rgba(216, 166, 106, 0.09);
 }
 
 .rp-flagchip {
@@ -274,7 +277,7 @@
   .rp-table td::before {
     content: attr(data-label);
     font-size: 12px;
-    color: #6b7280;
+    color: var(--text-secondary);
   }
 
   /* Card layout puts the label left and the value right; the two-line
@@ -308,7 +311,7 @@
   align-items: center;
   justify-content: center;
   padding: 1.5rem;
-  background: rgba(15, 23, 42, 0.45);
+  background: rgba(38, 50, 56, 0.45);
   animation: rp-modal-in 0.16s ease;
 }
 
@@ -329,7 +332,7 @@
   background: #ffffff;
   border-radius: var(--radius-lg); /* modals 16px, cards 12px */
   padding: 1.6rem 1.8rem 1.8rem;
-  box-shadow: 0 20px 60px rgba(10, 23, 41, 0.28); /* floating layers own their big shadow */
+  box-shadow: 0 20px 60px rgba(38, 50, 56, 0.28); /* floating layers own their big shadow */
 }
 
 .rp-modal__close {
@@ -344,15 +347,15 @@
   border: 1px solid var(--border-soft);
   border-radius: 9px;
   background: #ffffff;
-  color: #64748b;
+  color: #68737b;
   cursor: pointer;
   transition: color 0.15s, border-color 0.15s, background 0.15s;
 }
 
 .rp-modal__close:hover {
-  background: #f4f5f8;
+  background: #f2f3f4;
   color: var(--ink);
-  border-color: #cbd5e1;
+  border-color: #ccd3d6;
 }
 
 .rp-modal__close svg {
@@ -365,8 +368,8 @@
 .rp-skel {
   min-height: 104px;
   box-shadow: none;
-  border-color: #eef1f5;
-  background: linear-gradient(100deg, #f1f5f9 30%, #f8fafc 50%, #f1f5f9 70%);
+  border-color: #eef0f1;
+  background: linear-gradient(100deg, #eff1f2 30%, #f7f8f8 50%, #eff1f2 70%);
   background-size: 200% 100%;
   animation: rp-shimmer 1.3s ease-in-out infinite;
 }
@@ -391,5 +394,40 @@
 
   .rp-skel {
     animation: none;
+  }
+}
+
+/* ---- Print: the report as a clean PDF ----------------------------------------
+   Download PDF runs window.print(); these rules turn the live page into the
+   clinical artifact - no app chrome, no buttons, colors kept, no row split
+   across a page break. */
+@media print {
+  * {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .kr-topbar,
+  .rp-header__actions,
+  .rp-card__ctrls {
+    display: none !important;
+  }
+
+  .kr-page {
+    max-width: none;
+    padding: 0;
+  }
+
+  /* Entrance animations must not leave a half-faded page in the PDF. */
+  .kr-reveal {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+
+  .rp-kpi,
+  .rp-card,
+  .rp-table tr {
+    break-inside: avoid;
   }
 }

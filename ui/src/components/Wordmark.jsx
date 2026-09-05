@@ -5,13 +5,13 @@
 const SLATE = '#263238';
 
 // The A's are outlines (filled polygons) because a sharp apex needs exact
-// edges; K, I and R are plain 8-unit strokes on a 108-unit cap height.
-const LAMBDA = 'M51 0 L102 108 L92.4 108 L51 20 L9.6 108 L0 108 Z';
+// edges; K, I and R are plain 9-unit strokes on a 108-unit cap height.
+const LAMBDA = 'M51 0 L102 108 L91.2 108 L51 22.5 L10.8 108 L0 108 Z';
 
 export default function Wordmark() {
   return (
     <svg className="kr-wordmark" viewBox="0 0 554 108" role="img" aria-label="Kaira">
-      <g stroke={SLATE} strokeWidth="8" fill="none">
+      <g stroke={SLATE} strokeWidth="9" fill="none">
         <path d="M8 0 V108" />
         <path d="M84 3 L10 58 L88 105" />
         <path d="M290 0 V108" />

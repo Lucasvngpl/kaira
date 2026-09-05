@@ -234,20 +234,17 @@ body {
   height: 13px;
 }
 
-/* ---- Status pill: ink-outline pill, coloured dot ----------------------------
-   The outline is monochrome; only the DOT carries the status colour, so
-   results still always read the same without a coloured pill. */
+/* ---- Status marker: coloured dot + plain text -------------------------------
+   No outline - same dot-and-text language as the chips. Only the DOT
+   carries the status colour, so results always read the same without a
+   coloured (or boxed) pill. */
 
 .kr-pill {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 3px 12px 4px;
-  border-radius: 999px;
-  background: transparent;
   color: var(--ink);
-  border: 0.5px solid var(--ink);
-  font-size: 0.75rem;
+  font-size: 0.78rem;
   font-weight: 500;
   line-height: 1.3;
   white-space: nowrap;

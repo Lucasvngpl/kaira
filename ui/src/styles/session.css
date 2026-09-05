@@ -47,7 +47,7 @@
 .sn-progress {
   width: 100%;
   height: 9px;
-  background: #f1f5f9;
+  background: #eff1f2;
   border-radius: 999px;
   overflow: hidden;
 }
@@ -277,7 +277,7 @@
   width: 22px;
   height: 6px;
   border-radius: 3px;
-  background: #eef1f4;
+  background: #eef0f1;
 }
 
 .sn-meter__seg--on {
@@ -302,7 +302,7 @@
 .sn-spark__band {
   /* Faint on purpose: at 64px tall the band covers most of the widget, and
      a heavier fill reads as a grey box with a line lost inside it. */
-  fill: rgba(148, 163, 184, 0.08);
+  fill: rgba(38, 50, 56, 0.05);
 }
 
 .sn-spark__line {
@@ -317,7 +317,7 @@
 /* Rejected (untrusted) windows: the line gaps and a grey dot marks the
    sample, so the artifact gate is visible instead of interpolated away. */
 .sn-spark__reject {
-  fill: #cbd5e1;
+  fill: #ccd3d6;
 }
 
 /* Live badge: recording-style pulse while a task is running. The ring radiates
@@ -507,7 +507,7 @@
 .sn-skel__bar {
   height: 14px;
   border-radius: 7px;
-  background: linear-gradient(100deg, #f1f5f9 30%, #f8fafc 50%, #f1f5f9 70%);
+  background: linear-gradient(100deg, #eff1f2 30%, #f7f8f8 50%, #eff1f2 70%);
   background-size: 200% 100%;
   animation: sn-shimmer 1.3s ease-in-out infinite;
 }

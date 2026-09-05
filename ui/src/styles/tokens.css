@@ -21,8 +21,8 @@
 
   /* --- Ink / text (Deep Slate doubles as the ink) ----------------------- */
   --ink: #263238;
-  --text-secondary: #5c6378;
-  --text-tertiary: #8a8fa3;
+  --text-secondary: #56636b;
+  --text-tertiary: #8a949b;
 
   /* --- Borders / surfaces ---------------------------------------------- */
   /* Neutral greys, no blue cast - hairlines should be quiet, not tinted. */
@@ -48,8 +48,8 @@
   --chart-bar: var(--signal);
   --chart-flag: var(--sand);
   --chart-line: var(--ink);
-  --chart-grid: #e6e9ee;
-  --chart-tick: #64748b;
+  --chart-grid: #e7e8e9;
+  --chart-tick: #68737b;
 
   /* --- Typography: DM Sans everywhere; the KAIRA wordmark is drawn SVG
      paths (Wordmark.jsx), not type ----------------------------------------- */
