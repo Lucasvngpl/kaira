@@ -5,7 +5,7 @@
 // clinician gets one quiet line telling them what just happened before the
 // next prompt replaces it.
 import { useEffect, useRef, useState } from 'react';
-import { FiArrowRight, FiCheck, FiClock, FiPlay, FiX } from 'react-icons/fi';
+import { FiArrowRight, FiArrowUpRight, FiCheck, FiClock, FiX } from 'react-icons/fi';
 import { getLiveLoad, getNextTask, postAnswer, errorText, isConflict } from '../api.js';
 import usePoll from '../hooks/usePoll.js';
 import Periodogram from './Periodogram.jsx';
@@ -205,8 +205,8 @@ export default function RunScreen({ session, baseline, band = [0.74, 1.35], onFi
                 {stage === 'reading' && (
                   <>
                     <button className="kr-action kr-action--primary" onClick={start}>
-                      <FiPlay aria-hidden="true" />
                       Start task
+                      <FiArrowUpRight aria-hidden="true" />
                     </button>
                     <p className="kr-hint">Starts the stopwatch and the live load readout.</p>
                   </>
@@ -219,7 +219,7 @@ export default function RunScreen({ session, baseline, band = [0.74, 1.35], onFi
                     </span>
                     <div className="sn-verdicts">
                       <button
-                        className="kr-action kr-action--primary"
+                        className="kr-btn sn-verdict--good"
                         onClick={() => score('correct')}
                         disabled={busy}
                       >

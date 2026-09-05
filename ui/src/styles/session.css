@@ -10,6 +10,12 @@
   gap: 18px;
 }
 
+/* The CTA hugs its label instead of stretching into a bar - a pill that
+   wraps its text reads as a button, a full-width slab reads as a banner. */
+.sn-start__card .kr-action {
+  align-self: flex-start;
+}
+
 /* ---- Baseline --------------------------------------------------------------- */
 
 .sn-baseline {
@@ -61,6 +67,11 @@
   font-size: 13px;
   color: var(--text-tertiary);
   font-variant-numeric: tabular-nums;
+}
+
+/* Air above the demo skip button, which sits right under the countdown. */
+.sn-baseline__card .kr-btn {
+  margin-top: 16px;
 }
 
 /* ---- Run screen ------------------------------------------------------------- */
@@ -144,14 +155,35 @@
   gap: 8px;
 }
 
-/* Wrong / Timeout are outlined with status-coloured content: a verdict is a
-   fact being recorded, not a danger action, so no filled red buttons. */
+/* The three verdicts are peers: outline pills with status-coloured content
+   (a verdict is a fact being recorded, not a call to action, so none of
+   them gets a filled default). On HOVER each fills with its own status
+   colour - at the moment of commitment the button declares what it records. */
+.sn-verdict--good {
+  color: var(--status-good);
+}
+
 .sn-verdict--bad {
   color: var(--status-bad);
 }
 
 .sn-verdict--warn {
   color: var(--status-warn);
+}
+
+.kr-btn.sn-verdict--good:hover:not(:disabled) {
+  background: var(--status-good);
+  border-color: var(--status-good);
+}
+
+.kr-btn.sn-verdict--bad:hover:not(:disabled) {
+  background: var(--status-bad);
+  border-color: var(--status-bad);
+}
+
+.kr-btn.sn-verdict--warn:hover:not(:disabled) {
+  background: var(--status-warn);
+  border-color: var(--status-warn);
 }
 
 .sn-outcome {

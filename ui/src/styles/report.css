@@ -127,18 +127,18 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid var(--border-soft);
-  border-radius: 8px;
+  border: 0.5px solid var(--ink);
+  border-radius: 999px;
   background: #ffffff;
-  color: #64748b;
+  color: var(--ink);
   cursor: pointer;
-  transition: color 0.15s, border-color 0.15s, background 0.15s;
+  transition: color 0.15s, background 0.15s;
 }
 
+/* Same invert-on-hover as every outlined control. */
 .rp-card__ctrl:hover {
-  background: #f4f5f8;
-  color: var(--ink);
-  border-color: #cbd5e1;
+  background: var(--ink);
+  color: #fff;
 }
 
 .rp-card__ctrl svg {
@@ -152,10 +152,22 @@
 
 /* ---- Task table ------------------------------------------------------------------ */
 
+/* Not a card: the record sits directly on the page under a hairline, like a
+   document section - the rows' own separators are all the structure a table
+   needs. */
 .rp-tablecard {
-  /* One border colour for the whole table: card edge, header underline and
-     row separators all read --hairline. */
-  border-color: var(--hairline);
+  border-top: 1px solid var(--hairline);
+  margin-top: 6px;
+}
+
+.rp-tablecard .kr-card__head {
+  padding: 14px 0 10px;
+}
+
+/* Flush with the page edge now that no card inset exists. */
+.rp-table th:first-child,
+.rp-table td:first-child {
+  padding-left: 0;
 }
 
 .rp-tablewrap {

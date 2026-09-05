@@ -88,15 +88,15 @@ body {
 
 /* ---- Card ------------------------------------------------------------------ */
 
-/* One card treatment everywhere: white, 1px hairline, 12px radius,
-   token shadow. Never a literal shadow value. */
+/* One card treatment everywhere: white, a quiet neutral hairline, 12px
+   radius, NO shadow - the border alone holds the card (floating layers
+   like the modal own their own big shadow). */
 .kr-card {
   display: flex;
   flex-direction: column;
   background: #fff;
   border: 1px solid var(--border-soft);
   border-radius: var(--radius-md);
-  box-shadow: var(--shadow-card);
   overflow: hidden;
 }
 
@@ -121,7 +121,7 @@ body {
   align-items: center;
   padding: 3px 12px;
   border-radius: 999px;
-  border: 1px solid var(--ink);
+  border: 0.5px solid var(--ink);
   background: transparent;
   color: var(--ink);
   font-size: 12px;
@@ -181,6 +181,21 @@ body {
   background: var(--accent-hover);
 }
 
+/* Hero variant: Neuralink-scale pill for the one action that starts the
+   work. Filled slate, not white - their white pill sits on a photo, ours
+   would vanish on the white page. */
+.kr-action--hero {
+  min-height: 48px;
+  padding: 0 26px;
+  font-size: 15px;
+}
+
+.kr-action--hero svg {
+  width: 18px;
+  height: 18px;
+  stroke-width: 1.5; /* the arrow stays a light gesture, not a bold glyph */
+}
+
 /* Outlined secondary: a thin ink-outline pill, transparent inside. */
 .kr-btn {
   display: inline-flex;
@@ -188,7 +203,7 @@ body {
   gap: 5px;
   padding: 8px 18px;
   border-radius: 999px;
-  border: 1px solid var(--ink);
+  border: 0.5px solid var(--ink);
   background: transparent;
   font-size: 13px;
   font-weight: 500;
@@ -198,8 +213,10 @@ body {
   transition: background 0.12s, transform 0.14s var(--ease-out);
 }
 
-.kr-btn:hover {
-  background: var(--bg-subtle);
+/* Neuralink-style invert: the outline pill fills with ink on hover. */
+.kr-btn:hover:not(:disabled) {
+  background: var(--ink);
+  color: #fff;
 }
 
 .kr-btn:active {
@@ -229,7 +246,7 @@ body {
   border-radius: 999px;
   background: transparent;
   color: var(--ink);
-  border: 1px solid var(--ink);
+  border: 0.5px solid var(--ink);
   font-size: 0.75rem;
   font-weight: 500;
   line-height: 1.3;

@@ -25,8 +25,9 @@
   --text-tertiary: #8a8fa3;
 
   /* --- Borders / surfaces ---------------------------------------------- */
-  --border-soft: #e5e7ee;
-  --border-strong: #c8ccd8;
+  /* Neutral greys, no blue cast - hairlines should be quiet, not tinted. */
+  --border-soft: #e4e4e4;
+  --border-strong: #cfcfcf;
   --hairline: #f1f1f1; /* table edges + row separators, one colour for all three */
   --bg-page: #ffffff;
   --bg-subtle: #fafafb;
@@ -54,11 +55,10 @@
      paths (Wordmark.jsx), not type ----------------------------------------- */
   --font-sans: 'DM Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
 
-  /* --- Radius / shadow -------------------------------------------------- */
+  /* --- Radius ------------------------------------------------------------ */
   --radius-field: 10px;
   --radius-md: 12px; /* cards, pills, buttons - THE radius */
   --radius-lg: 16px; /* modals */
-  --shadow-card: 0 1px 2px 0 rgb(0 0 0 / 0.05);
 
   /* Strong ease-out for press feedback (built-in easings are too weak). */
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);

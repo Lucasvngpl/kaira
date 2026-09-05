@@ -448,7 +448,8 @@ export default function ReportScreen({ sessionId, onNewSession, demo = false }) 
         </ChartCard>
       </div>
 
-      <section className="kr-card rp-tablecard kr-reveal kr-reveal--4">
+      {/* Deliberately not a card: a table already has its own structure. */}
+      <section className="rp-tablecard kr-reveal kr-reveal--4">
         <div className="kr-card__head">
           <h2 className="kr-cardtitle">Task record</h2>
           <span className="kr-badge">{tasks.length} tasks</span>

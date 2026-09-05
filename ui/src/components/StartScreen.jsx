@@ -1,6 +1,6 @@
 // New-assessment form: patient reference + domain, then hand off to baseline.
 import { useState } from 'react';
-import { FiArrowRight } from 'react-icons/fi';
+import { FiArrowUpRight } from 'react-icons/fi';
 import { startSession, errorText } from '../api.js';
 import '../styles/session.css';
 
@@ -63,9 +63,9 @@ export default function StartScreen({ info, onStarted }) {
           </select>
         </div>
 
-        <button className="kr-action kr-action--primary" type="submit" disabled={busy}>
+        <button className="kr-action kr-action--primary kr-action--hero" type="submit" disabled={busy}>
           {busy ? 'Starting session' : 'Begin baseline'}
-          <FiArrowRight aria-hidden="true" />
+          <FiArrowUpRight aria-hidden="true" />
         </button>
 
         {error && (
