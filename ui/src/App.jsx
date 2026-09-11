@@ -6,6 +6,7 @@ import { useState } from 'react';
 import { getRoot } from './api.js';
 import usePoll from './hooks/usePoll.js';
 import Wordmark from './components/Wordmark.jsx';
+import PatientScreen from './components/PatientScreen.jsx';
 import StartScreen from './components/StartScreen.jsx';
 import BaselineScreen from './components/BaselineScreen.jsx';
 import RunScreen from './components/RunScreen.jsx';
@@ -17,7 +18,19 @@ import ReportScreen from './components/ReportScreen.jsx';
 // rest of the navigation.
 const DEMO = new URLSearchParams(window.location.search).get('demo');
 
+// ?patient=<session id> turns this tab into the patient's display - the one
+// sanctioned deep link, because the second screen must be able to join a
+// session that is already running.
+const PATIENT_SESSION = new URLSearchParams(window.location.search).get('patient');
+
+// The patient display is its own tiny app: no topbar, no state machine.
+// Split at the top level (not an early return) so ClinicianApp's hooks
+// stay unconditional - the rules of hooks are part of the house style.
 export default function App() {
+  return PATIENT_SESSION ? <PatientScreen sessionId={PATIENT_SESSION} /> : <ClinicianApp />;
+}
+
+function ClinicianApp() {
   const [phase, setPhase] = useState(DEMO === 'report' ? 'report' : 'start'); // start | baseline | run | report
   const [session, setSession] = useState(null); // {id, baselineSeconds, patientRef, domain}
   const [baseline, setBaseline] = useState(null); // {stable, seconds} from the finished baseline
@@ -55,6 +68,13 @@ export default function App() {
             <span>
               {session.patientRef} · {session.domain}
             </span>
+          )}
+          {/* Opens the patient-facing display in its own tab, to be dragged
+              onto the tablet / second screen. Live phases only. */}
+          {session && phase !== 'report' && (
+            <a className="kr-btn" href={`?patient=${session.id}`} target="_blank" rel="noreferrer">
+              Patient screen
+            </a>
           )}
           {/* A clinician must never mistake a demo for a recording, so the
               warning rides every LIVE screen. The report is the finished

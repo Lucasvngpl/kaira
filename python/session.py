@@ -288,6 +288,22 @@ class Session:
                 return t
         return min(pool, key=lambda t: self._used_ids.index(t.id))
 
+    def patient_view(self) -> dict:
+        """What the patient's display may know: the phase, and the current
+        stimulus when there is one. Never answers, never measurements -
+        this dict is the entire information budget of the patient screen.
+        Read-only on purpose: polling it takes no samples and advances
+        nothing, so a second (or crashed) patient tab cannot corrupt a
+        session."""
+        if self.ended:
+            return {"phase": "ended"}
+        if not self._baseline_done:
+            return {"phase": "baseline"}
+        if self._current is None:
+            return {"phase": "waiting"}
+        t = self._current
+        return {"phase": "task", "image": t.image, "kind": t.kind, "level": t.level}
+
     def live_load(self) -> dict:
         """Current load as a multiple of baseline, polled ~1 Hz by the UI.
 

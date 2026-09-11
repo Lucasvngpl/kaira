@@ -140,6 +140,11 @@ def live_load(session_id: str) -> dict:
     return _get(session_id).live_load()
 
 
+@app.get("/session/{session_id}/patient-view")
+def patient_view(session_id: str) -> dict:
+    return _get(session_id).patient_view()
+
+
 if __name__ == "__main__":
     import argparse
 

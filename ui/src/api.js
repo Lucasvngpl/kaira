@@ -34,6 +34,10 @@ export const getReport = (id) => client.get(`/session/${id}/report`).then((r) =>
 
 export const getLiveLoad = (id) => client.get(`/session/${id}/live-load`).then((r) => r.data);
 
+// Read-only and sample-free: safe for a second device to poll forever.
+export const getPatientView = (id) =>
+  client.get(`/session/${id}/patient-view`).then((r) => r.data);
+
 // House error cascade: server detail if present, else the transport message.
 export const errorText = (e) =>
   e.response?.data?.detail || e.response?.data?.error || e.message || 'Something went wrong';

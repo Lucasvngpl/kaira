@@ -534,3 +534,44 @@
     animation: none;
   }
 }
+
+/* ---- Patient display ----------------------------------------------------------
+   A tablet or second screen facing the patient: one calm thing at a time,
+   oversized type, the stimulus as large as the screen allows. Nothing
+   measured, nothing clickable. */
+
+.pt-screen {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
+  padding: 32px;
+  background: var(--bg-page);
+}
+
+.pt-stimulus {
+  max-width: min(92vw, 1100px);
+  max-height: 74dvh;
+  object-fit: contain;
+}
+
+.pt-message {
+  margin: 0;
+  font-size: clamp(1.6rem, 4vw, 2.6rem);
+  font-weight: 500;
+  color: var(--ink);
+  text-align: center;
+  text-wrap: balance;
+}
+
+.pt-foot {
+  position: fixed;
+  bottom: 26px;
+  opacity: 0.55;
+}
+
+.pt-foot .kr-wordmark {
+  height: 13px;
+}

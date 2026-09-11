@@ -32,6 +32,9 @@ class Task:
     kind: str  # word_list | digit_span | digit_span_backward | paired_associates
     prompt: str  # read aloud verbatim by the clinician
     answer: str  # scoring criterion the clinician checks against
+    # Path under ui/public (e.g. "/tasks/vis_01.png") shown on the PATIENT
+    # display for visual stimuli; empty for spoken-only tasks.
+    image: str = ""
 
 
 LEVEL_MIN = 1
