@@ -1,6 +1,6 @@
-// Resting-baseline recording: poll progress ~1 Hz, hand off when done.
-// Every poll also lets the backend take a baseline load sample, so polling
-// here is part of the measurement, not just cosmetics.
+// Resting-baseline recording: poll progress once a second, hand off when
+// done. Each poll also makes the backend take one baseline sample, so this
+// polling IS the measurement - stop polling and the baseline goes deaf.
 import { useRef, useState } from 'react';
 import { getBaselineStatus, skipBaseline } from '../api.js';
 import usePoll from '../hooks/usePoll.js';

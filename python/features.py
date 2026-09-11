@@ -1,5 +1,7 @@
 """Spectral features and the cognitive load index.
 
+The job in one line: a 2 s EEG window goes in, one effort number comes out.
+
 Interface (fixed - session.py and the API are built against it):
     cognitive_load(window, fs, ch_names) -> float
     relative_load(current: float, baseline: float) -> float

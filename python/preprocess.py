@@ -8,7 +8,7 @@ four-function interface in HANDOFF section 5; clean() below is the seam the
 scaffold proposes, because the report contract (section 7) needs a per-task
 `trusted` flag and artifact rejection is the only honest source of it.
 session.py calls clean() between get_window() and cognitive_load() - if the team
-changes this shape, update session._sample_load() to match.
+changes this shape, update session._clean_window() to match.
 
 TODO(team) - the pipeline this file must implement, in order, and why:
   1. 1 Hz HIGH-PASS FIRST. The eego is DC-coupled; raw values sit around

@@ -78,8 +78,9 @@ assert set(features.FRONTAL + features.PARIETAL) <= set(stream.ch_names), \
 # amplify. Team-tunable once real recordings show typical resting spread.
 BASELINE_SD_FLOOR = 0.05
 
-# The movement word shown in the report's action column, bucketed from
-# decide's richer reason keys (clamps read as their stationary movement).
+# The movement word for the report's action column. decide's six reasons
+# collapse to four movements: hitting the ceiling displays as "hold" and
+# hitting the floor as "repeat", because either way the level stayed put.
 ACTION_WORD = {"up": "up", "down": "down", "hold": "hold", "ceiling": "hold",
                "repeat": "repeat", "floor": "repeat"}
 
@@ -305,7 +306,7 @@ class Session:
         return {"phase": "task", "image": t.image, "kind": t.kind, "level": t.level}
 
     def live_load(self) -> dict:
-        """Current load as a multiple of baseline, polled ~1 Hz by the UI.
+        """Current load as a multiple of baseline, polled at 4 Hz by the UI.
 
         While a task is active the sample is also buffered: the task's
         recorded load is the mean of what was measured while the patient

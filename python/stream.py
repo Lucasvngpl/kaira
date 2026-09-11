@@ -62,7 +62,8 @@ def get_window(seconds: float) -> np.ndarray:
 
     TODO(team):
       - Read from the BrainFlow ring buffer (get_current_board_data) so this
-        never blocks; the API polls it at ~1 Hz for the live load readout.
+        never blocks; the API polls it at 4 Hz for the live load readout,
+        so the ring buffer must always hold the LATEST 2 s (1024 samples).
       - Return microvolts. The eego is DC-COUPLED: raw values sit around
         +4800 uV, not zero. Do NOT zero-center here; preprocess.py owns the
         1 Hz high-pass that makes amplitudes meaningful.
@@ -81,7 +82,7 @@ def pick(data: np.ndarray, names: list[str]) -> np.ndarray:
     """Return only the rows of `data` whose channel names are in `names`.
 
     TODO(team): index rows via ch_names; raise on unknown names rather than
-    silently returning the wrong channels. Used by features.py to grab the
-    frontal and parietal groups.
+    silently returning the wrong channels. Optional convenience - features.py
+    currently does its own name lookup.
     """
-    raise NotImplementedError("TODO(team): channel picking - nothing calls this until features.py is real")
+    raise NotImplementedError("TODO(team): channel picking - currently unused; features.py indexes channels by name itself")
