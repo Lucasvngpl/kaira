@@ -1,4 +1,4 @@
-// The report screen: established level up front, the signature load-vs-level
+// The report screen: cognitive level up front, the signature load-vs-level
 // chart, then the task-by-task record. Chart bodies are functions of `big` so
 // the inline card and the expand modal render from one source of truth
 // (house pattern from the staff analytics page).
@@ -421,7 +421,7 @@ export default function ReportScreen({ sessionId, onNewSession, demo = false }) 
 
       <div className="rp-kpis kr-reveal kr-reveal--2">
         <Kpi
-          label="Established level"
+          label="Cognitive level"
           sub={report.reason}
           pill={(() => {
             const [cls, text] = END_PILL[report.end_reason] || ['kr-pill--idle', 'In progress'];
