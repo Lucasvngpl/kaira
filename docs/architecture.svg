@@ -13,10 +13,9 @@
       <path d="M0 0 L10 5 L0 10 z" fill="#87cc9a"/>
     </marker>
   </defs>
-  <rect width="1440" height="430" fill="#ffffff"/>
-
+  
   <!-- boxes -->
-  <g stroke="#263238" stroke-width="1.5" fill="#ffffff">
+  <g stroke="#263238" stroke-width="1.5" fill="none">
     <rect x="30"   y="120" width="190" height="96" rx="14"/>
     <rect x="272"  y="120" width="190" height="96" rx="14"/>
     <rect x="514"  y="120" width="190" height="96" rx="14"/>
@@ -39,12 +38,12 @@
     <text x="125" y="197">answering questions</text>
     <text x="367" y="180">64-channel EEG</text>
     <text x="367" y="197">512 samples / s</text>
-    <text x="609" y="180">stream.py &#183; preprocess.py</text>
+    <text x="609" y="180">live 2 s windows</text>
     <text x="609" y="197">artifacts out, trust flag</text>
-    <text x="851" y="180">features.py &#183; Welch PSD</text>
+    <text x="851" y="180">Welch spectrum</text>
     <text x="851" y="197">ln(frontal &#952; / parietal &#945;)</text>
-    <text x="1093" y="180">decide.py &#183; staircase,</text>
-    <text x="1093" y="197">EEG changes 2 of 6 cells</text>
+    <text x="1093" y="180">answer sets the direction,</text>
+    <text x="1093" y="197">the EEG can veto it</text>
     <text x="1325" y="180">scores the answer,</text>
     <text x="1325" y="197">reads the next task</text>
   </g>
