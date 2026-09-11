@@ -55,7 +55,12 @@ Anything that smells generated is a liability in the room.
 - Graphic language: circle + pulse + direction (closed loop, neural signal, adaptation). Diagrams show signals converging -> insight -> adaptation.
 - UI mapping: `--accent` = slate (buttons, focus, decisions), `--signal` = Neural Blue (live pulse, effort meter, baseline progress, chart bars, spectrum frontal curve); the load sparkline is slate - the formula OUTPUT pairs with the slate number, blue/green stay the raw bands, chart level line = slate pen, flagged bars = Warm Sand.
 
-## Conventions
+## Build day (2026-09-12) - standing prep
+
+- Thresholds/ratio are ON STANDBY for a switch: Saturday's live testing may change them, Lucas will prompt the change and it must land in minutes. Every knob is a single named constant: `decide.LOW_LOAD/HIGH_LOAD` (band), `START_LEVEL`, `MAX_TASKS`, `CONVERGENCE_RUN`; `session.BASELINE_*`, `SAMPLE_SECONDS`; the formula itself (bands/channels) lives in `features.BANDS/FRONTAL/PARIETAL` (Lucas's file - he edits or dictates). After ANY python edit: restart the API, rerun both suites.
+- Friday: Aarnav pushes real `stream.py`/`preprocess.py`. Pressure-test against the checklist in his integration message: exact channel names (session now asserts at import), rows never deleted in clean(), high-pass before handoff, trusted flag, `get_window(2.0)` returns the LATEST 2 s non-blocking (ring buffer >= 1024 samples at 512 Hz; must handle the first seconds before the buffer fills). Then `python/smoke_test.py` with SYNTHETIC off-path, and a live baseline watch.
+- Friday: Alice delivers the real Visuospatial questions + one grid image of 15 visuals to crop into individual stimuli (level specified per question). Pipeline: crop -> `ui/public/tasks/` -> task bank rebuilds with image references. How the PATIENT sees the visual decides the UI work (see Lucas).
+- Demo runbook (who clicks what, in which order, with fallbacks) gets written the moment Aarnav's code lands.
 
 - API on `127.0.0.1:8300` (8000 collides with Django dev servers). UI is Vite on 5173; CORS is pinned to that port.
 - Restart the API after editing `python/` (it does not run with --reload).

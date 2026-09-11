@@ -66,6 +66,12 @@ SPECTRUM_MAX_HZ = 20.0
 # One sanity check keeps decide's level range honest against the task bank.
 assert (decide.MIN_LEVEL, decide.MAX_LEVEL) == (tasks.LEVEL_MIN, tasks.LEVEL_MAX)
 
+# The likeliest silent failure on integration day: features.py skips channel
+# names it cannot find (case-sensitive), which would quietly poison every
+# load. Fail loudly at import instead, the moment a real montage arrives.
+assert set(features.FRONTAL + features.PARIETAL) <= set(stream.ch_names), \
+    "stream.ch_names is missing channels features.py needs (names are case-sensitive)"
+
 # Floor for the baseline's standard deviation (log units). z divides by the
 # SD, and a patient who sat unusually still would otherwise get a tiny SD
 # and absurdly inflated z-scores; the floor caps how much stillness can
