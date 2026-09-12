@@ -2,8 +2,11 @@
 // functions, never a URL). axios behind one instance; one-liners unwrap .data.
 import axios from 'axios';
 
-// Kaira's API runs on 8300 (8000 is squatted by Django dev servers).
-const BASE = import.meta.env.VITE_API_BASE || 'http://127.0.0.1:8300';
+// Relative on purpose: "/api" means "the host that served this page", so the
+// clinician laptop and the patient tablet both reach the API without anyone
+// baking an IP into config. Vite relays /api to port 8300 (see vite.config.js).
+// The override exists for the odd case of a UI and API on different machines.
+const BASE = import.meta.env.VITE_API_BASE || '/api';
 
 const client = axios.create({
   baseURL: BASE,

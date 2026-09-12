@@ -47,8 +47,6 @@ from brainflow.board_shim import BoardIds, BoardShim, BrainFlowInputParams
 # API) is the whole synthetic -> real switch. api/main.py writes it at startup.
 SYNTHETIC: bool = True
 
-BOARD_ID = BoardIds.SYNTHETIC_BOARD if SYNTHETIC else BoardIds.ANT_NEURO_EE_225_BOARD
-
 fs: int = 512  # verified sampling rate of the EE-225; see unresolved item 1 above
 
 # VERIFIED ORDER (2026-09-12): read from the header of the EO-EC .cnt in
@@ -94,8 +92,12 @@ def connect() -> None:
     global _board, _eeg_rows, fs
     if SYNTHETIC:
         return  # nothing to open; get_window() generates data directly
+    # Integration fix (2026-09-12): the board id must be chosen HERE, not at
+    # import - api/main.py flips SYNTHETIC after importing this module, so a
+    # module-level constant would freeze the wrong board on the real path.
+    board_id = BoardIds.ANT_NEURO_EE_225_BOARD
     params = BrainFlowInputParams()
-    _board = BoardShim(BOARD_ID, params)
+    _board = BoardShim(board_id, params)
     _board.prepare_session()
     try:
         _board.config_board("sampling_rate:512")  # UNVERIFIED - see unresolved item 1
@@ -108,7 +110,7 @@ def connect() -> None:
             "retrying (see HANDOFF and unresolved item 1 in this file's docstring)"
         ) from exc
     _board.start_stream()
-    fs = BoardShim.get_sampling_rate(BOARD_ID)
+    fs = BoardShim.get_sampling_rate(board_id)
     if fs != 512:
         _board.stop_stream()
         _board.release_session()
@@ -117,7 +119,7 @@ def connect() -> None:
             f"expected 512 Hz after config_board, board reports {fs} Hz - "
             "stop and confirm with HANDOFF before proceeding (unresolved item 1)"
         )
-    _eeg_rows = BoardShim.get_eeg_channels(BOARD_ID)
+    _eeg_rows = BoardShim.get_eeg_channels(board_id)
     if len(_eeg_rows) != len(ch_names):
         _board.stop_stream()
         _board.release_session()

@@ -60,7 +60,9 @@ async def _lifespan(app: FastAPI):
 
 app = FastAPI(title="Kaira", description="Adaptive cognitive assessment - demo API", lifespan=_lifespan)
 
-# The React dev server is the only client; keep CORS scoped to it.
+# The UI reaches us through Vite's /api proxy, so its requests arrive
+# same-origin and never consult this list. It stays for a client that calls
+# this port directly, and keeping it scoped means such a call fails loudly.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
