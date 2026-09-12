@@ -53,10 +53,7 @@ const RESULT_PILL = {
 // Task kinds -> clinician-facing names; the machine id stays as a small
 // second line for cross-referencing with tasks.py.
 const KIND_COPY = {
-  word_list: 'Word recall',
-  digit_span: 'Digit span',
-  digit_span_backward: 'Digit span, reverse',
-  paired_associates: 'Paired associates',
+  degraded_object: 'Degraded drawing',
 };
 
 // mem_l3_001 -> "Item 1": the clinician cares which stimulus from the level's
