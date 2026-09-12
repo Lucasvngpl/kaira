@@ -72,17 +72,18 @@ def run() -> None:
         assert t1 == s.next_task(), "next_task must be idempotent until answered"
 
         _, r = play(s, HIGH, "correct")  # correct at high effort: the EEG cell
-        assert (r["action"], r["next_level"], r["reason"]) == ("hold", 2, "hold")
+        start = decide.START_LEVEL
+        assert (r["action"], r["next_level"], r["reason"]) == ("hold", start, "hold")
         assert "high effort" in r["reason_text"] and r["bars"] == 5
         assert not r["ended"], "session end is a server fact, and this is not the end"
         _, r = play(s, MID, "incorrect", rt=12.0)
-        assert (r["reason"], r["next_level"]) == ("down", 1)
+        assert (r["reason"], r["next_level"]) == ("down", start - 1)
         for _ in range(3):
             _, r = play(s, HIGH, "correct")
         assert r["converged"] and r["ended"] and s.ended
 
         rep = s.report()
-        assert rep["final_level"] == 1 and rep["end_reason"] == "converged"
+        assert rep["final_level"] == start - 1 and rep["end_reason"] == "converged"
         assert rep["reason"] == decide.END_TEXT["converged"]
         assert rep["accuracy"] == 0.8 and rep["disengaged_count"] == 0 and rep["untrusted_rate"] == 0.0
         assert rep["band"] == [round(math.exp(decide.LOW_LOAD), 2), round(math.exp(decide.HIGH_LOAD), 2)]
@@ -93,18 +94,19 @@ def run() -> None:
         # --- the other cells + the disengaged flag on the SECOND repeat -----
         s2 = begin_calibrated("PT-TEST2")
         _, r = play(s2, LOW, "correct")  # efficient -> up
-        assert (r["reason"], r["next_level"]) == ("up", 3)
+        assert (r["reason"], r["next_level"]) == ("up", start + 1)
         _, r = play(s2, HIGH, "incorrect")  # struggling -> down
-        assert (r["reason"], r["next_level"]) == ("down", 2)
+        assert (r["reason"], r["next_level"]) == ("down", start)
         _, r = play(s2, LOW, "incorrect")  # first no-effort miss: repeat, no flag yet
-        assert (r["reason"], r["next_level"], r["flags"]) == ("repeat", 2, [])
+        assert (r["reason"], r["next_level"], r["flags"]) == ("repeat", start, [])
         _, r = play(s2, LOW, "incorrect")  # second in a row: disengaged
         assert r["reason"] == "repeat" and "disengaged" in r["flags"]
         assert s2.report()["disengaged_count"] == 1
 
         # --- floor: a run of failures at level 1 is NOT convergence ---------
         s3 = begin_calibrated("PT-TEST3")
-        play(s3, MID, "timeout", rt=30.0)  # 2 -> 1
+        for _ in range(decide.START_LEVEL - decide.MIN_LEVEL):
+            play(s3, MID, "timeout", rt=30.0)  # walk down to the floor
         for _ in range(3):
             _, r = play(s3, MID, "timeout", rt=30.0)  # stuck at 1
         assert s3.ended and not r["converged"]
@@ -119,7 +121,8 @@ def run() -> None:
             _, r = play(s4, MID, "correct" if i % 2 == 0 else "incorrect")
         assert s4.ended and r["ended"] and not r["converged"]
         rep4 = s4.report()
-        assert rep4["end_reason"] == "max_tasks" and rep4["final_level"] == 2
+        # Ping-pong between start and start+1; the modal tie claims the LOWER.
+        assert rep4["end_reason"] == "max_tasks" and rep4["final_level"] == decide.START_LEVEL
 
         # --- no_effort: three no-effort misses stop the test, no level claim
         s5 = begin_calibrated("PT-TEST5")
