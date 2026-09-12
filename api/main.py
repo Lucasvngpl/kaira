@@ -305,6 +305,7 @@ def start(req: StartRequest) -> dict:
     s = session_mod.begin(req.patient_ref, req.domain)
     sessions[s.id] = s
     mark(f"session_start {s.id} {req.patient_ref} {req.domain}")
+    stream.rotate_recording(req.patient_ref)
     return {"session_id": s.id, "baseline_seconds": session_mod.BASELINE_SECONDS}
 
 
@@ -399,6 +400,7 @@ def answer(session_id: str, req: AnswerRequest) -> dict:
     mark(f"answer {req.task_id} {req.result} load={out['load']}")
     if out["ended"]:
         mark(f"session_end {session_id}")
+        stream.rotate_recording("idle")
     return out
 
 

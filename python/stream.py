@@ -112,18 +112,10 @@ def _connect_lsl(name_prefix: str | None = None) -> None:
     my_generation = _lsl_generation
 
     # Insurance recorder: everything received is also written to disk, so a
-    # forgotten LabRecorder never costs the team a recording. Raw float32
-    # frames plus a sidecar header; tools/replay-able with numpy alone.
-    import json, time as _time
-    rec_dir = Path(__file__).resolve().parent.parent / "data" / "recordings"
-    rec_dir.mkdir(parents=True, exist_ok=True)
-    stamp = _time.strftime("%Y%m%d-%H%M%S")
-    rec_path = rec_dir / f"{lsl_name}-{stamp}.f32"
-    (rec_dir / f"{lsl_name}-{stamp}.json").write_text(json.dumps(
-        {"stream": lsl_name, "fs": fs, "ch_names": ch_names,
-         "t0_unix": _time.time(), "layout": "frames (n_samples, n_ch) float32"}))
-    rec_file = open(rec_path, "ab")
-    print(f"tee-recording to {rec_path}")
+    # forgotten LabRecorder never costs the team a recording. One file per
+    # session (the API rotates on session start/end); "idle" covers the
+    # stretches in between, so the record stays gap-free.
+    _open_recording("idle")
 
     def _pull() -> None:
         global _lsl_write, _lsl_filled
@@ -132,15 +124,20 @@ def _connect_lsl(name_prefix: str | None = None) -> None:
             if not chunk:
                 continue
             arr = np.asarray(chunk, dtype=float).T  # (n_ch, n_new)
-            arr.T.astype(np.float32).tofile(rec_file)
-            rec_file.flush()  # a crash loses at most the in-flight chunk
+            with _rec_lock:
+                if _rec["file"] is not None:
+                    arr.T.astype(np.float32).tofile(_rec["file"])
+                    _rec["file"].flush()  # a crash loses at most the in-flight chunk
             n_new = arr.shape[1]
             cap = _lsl_ring.shape[1]
             for k in range(n_new):  # ring write; chunks are small (<= a few hundred samples)
                 _lsl_ring[:, (_lsl_write + k) % cap] = arr[:, k]
             _lsl_write = (_lsl_write + n_new) % cap
             _lsl_filled = min(cap, _lsl_filled + n_new)
-        rec_file.close()
+        with _rec_lock:
+            if _rec["file"] is not None:
+                _rec["file"].close()
+                _rec["file"] = None
 
     import threading
     threading.Thread(target=_pull, daemon=True).start()
@@ -151,6 +148,35 @@ _lsl_write = 0
 _lsl_filled = 0
 _lsl_generation = 0
 lsl_name: str | None = None  # name of the connected LSL stream, for display
+
+import threading
+
+_rec_lock = threading.Lock()
+_rec: dict = {"file": None}
+
+
+def _open_recording(tag: str) -> None:
+    import json
+    import time as _time
+    rec_dir = Path(__file__).resolve().parent.parent / "data" / "recordings"
+    rec_dir.mkdir(parents=True, exist_ok=True)
+    base = f"{lsl_name}-{_time.strftime('%Y%m%d-%H%M%S')}-{tag}"
+    (rec_dir / f"{base}.json").write_text(json.dumps(
+        {"stream": lsl_name, "fs": fs, "ch_names": ch_names, "tag": tag,
+         "t0_unix": _time.time(), "layout": "frames (n_samples, n_ch) float32"}))
+    _rec["file"] = open(rec_dir / f"{base}.f32", "ab")
+    print(f"tee-recording to {base}.f32")
+
+
+def rotate_recording(tag: str) -> None:
+    """Close the current tee file and start a new one - the API calls this
+    at session start (tag = patient ref) and end (back to idle). No-op when
+    nothing is being received."""
+    with _rec_lock:
+        if _rec["file"] is None:
+            return
+        _rec["file"].close()
+        _open_recording(tag)
 
 
 def connect(name_prefix: str | None = None) -> None:
