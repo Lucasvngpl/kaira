@@ -47,6 +47,14 @@ export const skipBaseline = (id) =>
 
 export const getNextTask = (id) => client.get(`/session/${id}/next-task`).then((r) => r.data);
 
+// The clinician pressed Start: from here the patient screen may show the task.
+export const postTaskStart = (id, task_id) =>
+  client.post(`/session/${id}/task-start`, { task_id }).then((r) => r.data);
+
+// Reuse the baseline recorded by an earlier session on this server.
+export const reuseBaseline = (id) =>
+  client.post(`/session/${id}/baseline-reuse`).then((r) => r.data);
+
 export const postAnswer = (id, task_id, result, elapsed_seconds) =>
   client.post(`/session/${id}/answer`, { task_id, result, elapsed_seconds }).then((r) => r.data);
 

@@ -289,7 +289,11 @@ def start(req: StartRequest) -> dict:
 
 @app.get("/session/{session_id}/baseline-status")
 def baseline_status(session_id: str) -> dict:
-    return _get(session_id).baseline_status()
+    st = _get(session_id).baseline_status()
+    st["previous_available"] = any(
+        s.id != session_id and s._baseline_done for s in sessions.values()
+    )
+    return st
 
 
 @app.post("/session/{session_id}/baseline-skip")
@@ -303,6 +307,26 @@ def baseline_skip(session_id: str) -> dict:
 @app.get("/session/{session_id}/next-task")
 def next_task(session_id: str) -> dict:
     return _get(session_id).next_task()
+
+
+class TaskStartRequest(BaseModel):
+    task_id: str
+
+
+@app.post("/session/{session_id}/task-start")
+def task_start(session_id: str, req: TaskStartRequest) -> dict:
+    _get(session_id).start_task(req.task_id)
+    return {"ok": True}
+
+
+@app.post("/session/{session_id}/baseline-reuse")
+def baseline_reuse(session_id: str) -> dict:
+    me = _get(session_id)
+    # The most recent other session whose baseline finished.
+    for other in reversed(list(sessions.values())):
+        if other.id != session_id and other._baseline_done:
+            return me.adopt_baseline(other)
+    raise HTTPException(status_code=404, detail="no earlier baseline exists in this server session")
 
 
 @app.post("/session/{session_id}/answer")

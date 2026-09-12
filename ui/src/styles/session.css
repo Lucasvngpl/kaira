@@ -69,8 +69,11 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* Air above the demo skip button, which sits right under the countdown. */
-.sn-baseline__card .kr-btn {
+/* Air above the baseline actions, which sit right under the countdown. */
+.sn-baseline__actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
   margin-top: 16px;
 }
 

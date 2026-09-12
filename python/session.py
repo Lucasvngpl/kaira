@@ -153,6 +153,7 @@ class Session:
         self.baseline_stable = True  # False only when the settling check ran and never passed
         # Task bookkeeping.
         self._current: tasks.Task | None = None
+        self.task_running = False  # True between the clinician's Start and their verdict
         self._task_samples: list[tuple[float, bool]] = []  # (load_log_abs, trusted) polled during a task
         self._used_ids: list[str] = []  # in administration order, for least-recently-used reuse
         self.ended = False
@@ -258,6 +259,19 @@ class Session:
         self.baseline_stable = stable
         self._baseline_done = True
 
+    def adopt_baseline(self, other: "Session") -> dict:
+        """Reuse a baseline already recorded in this process (same patient,
+        cap untouched): the zero point, the wobble, and the stability verdict
+        carry over, so a re-run session starts at the first task immediately.
+        preprocess's blink calibration is module-level and already done."""
+        self.state.baseline = other.state.baseline
+        self.state.baseline_sd = other.state.baseline_sd
+        self.baseline_seconds = other.baseline_seconds
+        self.baseline_stable = other.baseline_stable
+        self._calibrated = True
+        self._baseline_done = True
+        return self.baseline_status()
+
     def skip_baseline(self) -> dict:
         """Demo shortcut: end the baseline now with whatever has been sampled.
 
@@ -306,6 +320,14 @@ class Session:
             "total_max": decide.MAX_TASKS,
         }
 
+    def start_task(self, task_id: str) -> None:
+        """The clinician pressed Start: only now may the patient screen show
+        the stimulus. Before this, the clinician is still reading the prompt
+        and the patient must not get a head start on the drawing."""
+        if self._current is None or task_id != self._current.id:
+            raise ValueError("start is for a task that is not active")
+        self.task_running = True
+
     def _pick_task(self) -> tasks.Task:
         """Prefer an unseen task at the current level; reuse least-recently-used
         when exhausted. Never the same OBJECT twice in a row: the trailing item
@@ -337,7 +359,9 @@ class Session:
             return {"phase": "ended"}
         if not self._baseline_done:
             return {"phase": "baseline"}
-        if self._current is None:
+        if self._current is None or not self.task_running:
+            # A task may be fetched while the clinician still reads the
+            # prompt; the patient sees nothing until Start is pressed.
             return {"phase": "waiting"}
         t = self._current
         return {"phase": "task", "image": t.image, "kind": t.kind, "level": t.level}
@@ -410,6 +434,7 @@ class Session:
         self.state.level = d.next_level
         self.state.history.append(trial)
         self._current = None
+        self.task_running = False  # the patient screen goes calm between tasks
         self._task_samples = []
 
         if d.ended:

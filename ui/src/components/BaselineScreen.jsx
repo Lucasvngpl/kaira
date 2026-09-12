@@ -2,13 +2,14 @@
 // done. Each poll also makes the backend take one baseline sample, so this
 // polling IS the measurement - stop polling and the baseline goes deaf.
 import { useRef, useState } from 'react';
-import { getBaselineStatus, skipBaseline, errorText } from '../api.js';
+import { getBaselineStatus, skipBaseline, reuseBaseline, errorText } from '../api.js';
 import usePoll from '../hooks/usePoll.js';
 import '../styles/session.css';
 
 export default function BaselineScreen({ sessionId, seconds, canSkip, onDone }) {
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState('');
+  const [previousAvailable, setPreviousAvailable] = useState(false);
   const firedRef = useRef(false); // onDone must fire once, not once per poll
 
   // Hand the outcome up: how long it really ran, and whether the signal
@@ -25,6 +26,7 @@ export default function BaselineScreen({ sessionId, seconds, canSkip, onDone }) 
       try {
         const st = await getBaselineStatus(sessionId);
         setProgress(st.progress);
+        setPreviousAvailable(Boolean(st.previous_available));
         if (st.done) finish(st);
       } catch {
         // A missed poll keeps the last painted progress; the next one catches up.
@@ -40,6 +42,14 @@ export default function BaselineScreen({ sessionId, seconds, canSkip, onDone }) 
     } catch (e) {
       // The baseline keeps running either way, but the click must never
       // look dead - say why the server refused.
+      setError(errorText(e));
+    }
+  };
+
+  const reuse = async () => {
+    try {
+      finish(await reuseBaseline(sessionId));
+    } catch (e) {
       setError(errorText(e));
     }
   };
@@ -70,11 +80,18 @@ export default function BaselineScreen({ sessionId, seconds, canSkip, onDone }) 
         {seconds > 90 && <p className="kr-hint">Ends early once the signal settles.</p>}
         {/* Demo-only escape hatch for UI testing; the server refuses it on
             real hardware, so a patient session can never lose its baseline. */}
-        {canSkip && (
-          <button className="kr-btn" onClick={skip}>
-            Skip baseline (demo)
-          </button>
-        )}
+        <div className="sn-baseline__actions">
+          {previousAvailable && (
+            <button className="kr-btn" onClick={reuse}>
+              Use previous baseline
+            </button>
+          )}
+          {canSkip && (
+            <button className="kr-btn" onClick={skip}>
+              Skip baseline (demo)
+            </button>
+          )}
+        </div>
         {error && (
           <p className="kr-error" role="alert">
             {error}

@@ -6,7 +6,7 @@
 // next prompt replaces it.
 import { useEffect, useRef, useState } from 'react';
 import { FiArrowRight, FiArrowUpRight, FiCheck, FiClock, FiX } from 'react-icons/fi';
-import { getLiveLoad, getNextTask, postAnswer, errorText, isConflict } from '../api.js';
+import { getLiveLoad, getNextTask, postAnswer, postTaskStart, errorText, isConflict } from '../api.js';
 import usePoll from '../hooks/usePoll.js';
 import Periodogram from './Periodogram.jsx';
 import '../styles/session.css';
@@ -145,6 +145,8 @@ export default function RunScreen({ session, baseline, band = [0.74, 1.35], onFi
     setElapsed(0);
     setSamples([]); // the sparkline shows THIS task's read, not the last one's
     setStage('running');
+    // Tell the server, so the patient screen reveals the stimulus only now.
+    postTaskStart(session.id, task.task_id).catch(() => {});
   };
 
   const score = async (result) => {
