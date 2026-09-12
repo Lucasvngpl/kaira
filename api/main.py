@@ -68,6 +68,23 @@ from contextlib import asynccontextmanager
 
 LIVE_PREFIX = ""
 
+# Event markers, broadcast as their own LSL stream. LabRecorder ticks both
+# streams and the .xdf then carries the signal AND when each question ran,
+# on one clock. Failures are swallowed: markers must never break a session.
+_marker_outlet = None
+
+
+def mark(text: str) -> None:
+    global _marker_outlet
+    try:
+        if _marker_outlet is None:
+            from pylsl import StreamInfo, StreamOutlet
+            _marker_outlet = StreamOutlet(
+                StreamInfo("KairaMarkers", "Markers", 1, 0, "string", "kaira-markers"))
+        _marker_outlet.push_sample([text])
+    except Exception:
+        pass
+
 # The patient display proves it is alive by polling; the clinician cannot
 # start a session no patient screen would show. 5 s of silence = gone.
 _patient_seen = 0.0
@@ -287,6 +304,7 @@ def start(req: StartRequest) -> dict:
         raise SessionStateError("no patient screen is connected - scan the QR code on any device on this network")
     s = session_mod.begin(req.patient_ref, req.domain)
     sessions[s.id] = s
+    mark(f"session_start {s.id} {req.patient_ref} {req.domain}")
     return {"session_id": s.id, "baseline_seconds": session_mod.BASELINE_SECONDS}
 
 
@@ -319,6 +337,7 @@ class TaskStartRequest(BaseModel):
 @app.post("/session/{session_id}/task-start")
 def task_start(session_id: str, req: TaskStartRequest) -> dict:
     _get(session_id).start_task(req.task_id)
+    mark(f"task_start {req.task_id}")
     return {"ok": True}
 
 
@@ -376,7 +395,11 @@ def baseline_reuse(session_id: str) -> dict:
 
 @app.post("/session/{session_id}/answer")
 def answer(session_id: str, req: AnswerRequest) -> dict:
-    return _get(session_id).submit_answer(req.task_id, req.result, req.elapsed_seconds)
+    out = _get(session_id).submit_answer(req.task_id, req.result, req.elapsed_seconds)
+    mark(f"answer {req.task_id} {req.result} load={out['load']}")
+    if out["ended"]:
+        mark(f"session_end {session_id}")
+    return out
 
 
 @app.get("/session/{session_id}/report")

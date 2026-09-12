@@ -15,6 +15,8 @@ Interface (fixed - session.py, features.py and the API build against it):
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import numpy as np
 
 from brainflow.board_shim import BoardIds, BoardShim, BrainFlowInputParams
@@ -109,6 +111,20 @@ def _connect_lsl(name_prefix: str | None = None) -> None:
     _lsl_generation += 1  # a reconnect makes every older pull thread retire itself
     my_generation = _lsl_generation
 
+    # Insurance recorder: everything received is also written to disk, so a
+    # forgotten LabRecorder never costs the team a recording. Raw float32
+    # frames plus a sidecar header; tools/replay-able with numpy alone.
+    import json, time as _time
+    rec_dir = Path(__file__).resolve().parent.parent / "data" / "recordings"
+    rec_dir.mkdir(parents=True, exist_ok=True)
+    stamp = _time.strftime("%Y%m%d-%H%M%S")
+    rec_path = rec_dir / f"{lsl_name}-{stamp}.f32"
+    (rec_dir / f"{lsl_name}-{stamp}.json").write_text(json.dumps(
+        {"stream": lsl_name, "fs": fs, "ch_names": ch_names,
+         "t0_unix": _time.time(), "layout": "frames (n_samples, n_ch) float32"}))
+    rec_file = open(rec_path, "ab")
+    print(f"tee-recording to {rec_path}")
+
     def _pull() -> None:
         global _lsl_write, _lsl_filled
         while my_generation == _lsl_generation:
@@ -116,12 +132,15 @@ def _connect_lsl(name_prefix: str | None = None) -> None:
             if not chunk:
                 continue
             arr = np.asarray(chunk, dtype=float).T  # (n_ch, n_new)
+            arr.T.astype(np.float32).tofile(rec_file)
+            rec_file.flush()  # a crash loses at most the in-flight chunk
             n_new = arr.shape[1]
             cap = _lsl_ring.shape[1]
             for k in range(n_new):  # ring write; chunks are small (<= a few hundred samples)
                 _lsl_ring[:, (_lsl_write + k) % cap] = arr[:, k]
             _lsl_write = (_lsl_write + n_new) % cap
             _lsl_filled = min(cap, _lsl_filled + n_new)
+        rec_file.close()
 
     import threading
     threading.Thread(target=_pull, daemon=True).start()
