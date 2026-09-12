@@ -1,7 +1,6 @@
-"""EEG acquisition via BrainFlow - SKELETON, hand-written by the team.
+"""EEG acquisition via BrainFlow.
 
-Owner: Aarnav. This file is deliberately empty of real code (buildathon AI
-policy: the team must be able to defend every line of the signal chain).
+Owner: Aarnav.
 
 Verified hardware facts (HANDOFF.md section 3 - do not re-derive these):
   - Amplifier: ANT Neuro eego mylab 64, product code EE-225.
@@ -12,6 +11,23 @@ Verified hardware facts (HANDOFF.md section 3 - do not re-derive these):
   - Sampling rate 512 Hz, 24-bit, one A/D converter per channel.
   - BrainFlow's SYNTHETIC_BOARD emits plausible fake data through the
     identical API, so everything downstream develops with no hardware.
+
+*** UNRESOLVED - CONFIRM BEFORE SHIPPING (see chat writeup for full list) ***
+  1. BrainFlow's static descriptor for BoardIds.ANT_NEURO_EE_225_BOARD reports
+     a default sampling_rate of 16000 Hz, not 512 Hz. 512 Hz is presumably
+     reachable via config_board(), but the exact config string and whether
+     get_sampling_rate() reflects it afterward is UNVERIFIED - never tested
+     against real hardware. connect() below asserts fs == 512 after
+     configuring and raises loudly if that assertion fails; don't remove that
+     guard until this is confirmed on the real amp.
+  2. BoardShim.get_eeg_names(ANT_NEURO_EE_225_BOARD) raises
+     UNSUPPORTED_BOARD_ERROR - BrainFlow's board description has no channel
+     names for this board at all. Real channel order MUST come from the
+     CA-208 wiring/montage sheet, not from BrainFlow. REAL_CH_NAMES below is
+     still the old placeholder order - swap it for the verified order before
+     trusting any by-name channel logic downstream (this file's pick(),
+     preprocess.py's EOG_CHANNEL constant, features.py's frontal/parietal
+     picks).
 
 Interface (fixed - session.py, features.py and the API are built against it;
 changing it needs both branches, see HANDOFF section 8):
@@ -25,25 +41,23 @@ from __future__ import annotations
 
 import numpy as np
 
+from brainflow.board_shim import BoardIds, BoardShim, BrainFlowInputParams
+
 # Flipping this single constant (or passing --synthetic/--no-synthetic to the
 # API) is the whole synthetic -> real switch. api/main.py writes it at startup.
 SYNTHETIC: bool = True
 
-# TODO(team): board selection belongs here, roughly:
-#   BOARD_ID = BoardIds.SYNTHETIC_BOARD if SYNTHETIC else BoardIds.ANT_NEURO_EE_225_BOARD  # 36
-# plus a connect()/release() pair around BoardShim (prepare_session, start_stream).
+BOARD_ID = BoardIds.SYNTHETIC_BOARD if SYNTHETIC else BoardIds.ANT_NEURO_EE_225_BOARD
 
-fs: int = 512  # verified sampling rate of the EE-225; SYNTHETIC_BOARD is resampled/treated as this by the team's acquisition code
+fs: int = 512  # verified sampling rate of the EE-225; see unresolved item 1 above
 
-_rng = np.random.default_rng()  # placeholder noise source for get_window
-
-# TODO(team): populate from the board at connect time (BoardShim.get_eeg_names
-# or the CA-208 montage sheet). This placeholder is a PLAUSIBLE 10-10 layout,
-# not the cap's true channel order: features.py picks frontal/parietal
-# channels by name, so the synthetic path needs real electrode names to
-# exercise the real analysis. CPz (reference) and AFz (ground) are absent on
-# purpose - they never appear as data channels. M1/M2 are included and dead
-# in the provided dataset; preprocess.py drops them.
+# UNVERIFIED PLACEHOLDER - see unresolved item 2 above. This is a plausible
+# 10-10 layout, not the CA-208's true wiring order. CPz (reference) and AFz
+# (ground) are absent on purpose - they never appear as data channels. M1/M2
+# are included and dead in the provided dataset; preprocess.py excludes them
+# from anything that would be poisoned by a flat channel. Position 32 (index
+# 31) is asserted by HANDOFF to be the droplead EOG ring electrode - CONFIRM
+# this survives once the real order replaces this placeholder.
 ch_names: list[str] = [
     "Fp1", "Fpz", "Fp2",
     "AF7", "AF3", "AF4", "AF8",
@@ -56,33 +70,119 @@ ch_names: list[str] = [
     "O1", "Oz", "O2", "Iz",
 ]
 
+_rng = np.random.default_rng()  # noise source for the synthetic path only
+
+_board: BoardShim | None = None
+_eeg_rows: list[int] | None = None  # row indices of ch_names within BrainFlow's raw data array (real path only)
+
+
+def connect() -> None:
+    """Open the board (synthetic or real per SYNTHETIC) and start streaming.
+
+    Real path only - the synthetic path never touches BrainFlow's board
+    object at all (see get_window). Deliberate simplification: BrainFlow's
+    own SYNTHETIC_BOARD exposes just 16 generic channels
+    (['Fz','C3','Cz','C4','Pz','PO7','Oz','PO8','F5','F7','F3','F1','F2','F4',
+    'F6','F8'] at 250 Hz) which doesn't line up with our 64-channel/512 Hz
+    montage, so routing fake data through it would mean either faking a
+    64-channel remap on top of BrainFlow's own fake data (extra complexity
+    for no real benefit) or shrinking every downstream by-name channel pick
+    to whatever's in that list of 16. Keeping get_window's existing
+    self-contained numpy generator for SYNTHETIC=True avoids both problems.
+    CONFIRM with the team if a more realistic synthetic source (e.g.
+    BrainFlow's PLAYBACK_FILE_BOARD replaying converted .cnt data) is wanted
+    for a later pass - not implemented here, see chat writeup.
+    """
+    global _board, _eeg_rows, fs
+    if SYNTHETIC:
+        return  # nothing to open; get_window() generates data directly
+    params = BrainFlowInputParams()
+    _board = BoardShim(BOARD_ID, params)
+    _board.prepare_session()
+    try:
+        _board.config_board("sampling_rate:512")  # UNVERIFIED - see unresolved item 1
+    except Exception as exc:
+        _board.release_session()
+        _board = None
+        raise RuntimeError(
+            "config_board('sampling_rate:512') failed - confirm the exact "
+            "config string against the ANT Neuro / eego SDK manual before "
+            "retrying (see HANDOFF and unresolved item 1 in this file's docstring)"
+        ) from exc
+    _board.start_stream()
+    fs = BoardShim.get_sampling_rate(BOARD_ID)
+    if fs != 512:
+        _board.stop_stream()
+        _board.release_session()
+        _board = None
+        raise RuntimeError(
+            f"expected 512 Hz after config_board, board reports {fs} Hz - "
+            "stop and confirm with HANDOFF before proceeding (unresolved item 1)"
+        )
+    _eeg_rows = BoardShim.get_eeg_channels(BOARD_ID)
+    if len(_eeg_rows) != len(ch_names):
+        _board.stop_stream()
+        _board.release_session()
+        _board = None
+        raise RuntimeError(
+            f"BrainFlow reports {len(_eeg_rows)} EEG rows for this board id, "
+            f"but ch_names has {len(ch_names)} entries - the board id, cap "
+            "config, or ch_names placeholder disagree; do not proceed blind"
+        )
+
+
+def release() -> None:
+    """Stop and release the real board session. No-op for SYNTHETIC."""
+    global _board
+    if _board is None:
+        return
+    try:
+        _board.stop_stream()
+    finally:
+        _board.release_session()
+        _board = None
+
 
 def get_window(seconds: float) -> np.ndarray:
     """Return the most recent `seconds` of EEG as (n_channels, n_samples) in microvolts.
 
-    TODO(team):
-      - Read from the BrainFlow ring buffer (get_current_board_data) so this
-        never blocks; the API polls it at 4 Hz for the live load readout,
-        so the ring buffer must always hold the LATEST 2 s (1024 samples).
-      - Return microvolts. The eego is DC-COUPLED: raw values sit around
-        +4800 uV, not zero. Do NOT zero-center here; preprocess.py owns the
-        1 Hz high-pass that makes amplitudes meaningful.
-      - Rows must line up with ch_names.
+    Real path: pulls from BrainFlow's own ring buffer via
+    get_current_board_data, which always returns the latest N samples (zero
+    rows are NOT inserted by BrainFlow if fewer than N samples exist yet -
+    the array is simply shorter until the buffer fills; callers this early in
+    a session should be prepared for a shorter-than-requested window).
+    BrainFlow's default internal buffer capacity is 450,000 samples/channel,
+    far more than the 1024 samples (2 s @ 512 Hz) the API needs at its 4 Hz
+    poll rate, so no explicit buffer-size override is needed to avoid
+    overflow between polls.
+
+    Synthetic path: self-contained white noise around the eego's DC offset
+    (+4800 uV) - flat band power, so downstream load index hovers near
+    baseline and jitters. Fake data, real analysis. Does not go through
+    BrainFlow at all (see connect() docstring for why).
+
+    Per HANDOFF: the eego is DC-COUPLED, raw values sit around +4800 uV, not
+    zero. Do NOT zero-center here; preprocess.py owns the 1 Hz high-pass that
+    makes amplitudes meaningful.
     """
-    # Placeholder: white noise around the eego's DC offset (+4800 uV), so the
-    # real features.py has a spectrum to analyse and the whole stack runs
-    # end-to-end before this file is written. White noise has flat band
-    # powers, so the load index hovers near baseline and jitters - fake data,
-    # real analysis.
     n_samples = int(round(seconds * fs))
-    return 4800.0 + _rng.normal(0.0, 10.0, size=(len(ch_names), n_samples))
+    if SYNTHETIC or _board is None:
+        return 4800.0 + _rng.normal(0.0, 10.0, size=(len(ch_names), n_samples))
+    raw = _board.get_current_board_data(n_samples)
+    return raw[_eeg_rows, :]
 
 
 def pick(data: np.ndarray, names: list[str]) -> np.ndarray:
     """Return only the rows of `data` whose channel names are in `names`.
 
-    TODO(team): index rows via ch_names; raise on unknown names rather than
-    silently returning the wrong channels. Optional convenience - features.py
-    currently does its own name lookup.
+    Indexes via the module-level ch_names (assumes `data`'s rows are still in
+    that order, i.e. this is meant to run on a stream.get_window() output
+    before preprocess.clean() reorders/drops anything - see preprocess.py's
+    own docstring about clean()'s output shape, which is a separate open
+    question).
     """
-    raise NotImplementedError("TODO(team): channel picking - currently unused; features.py indexes channels by name itself")
+    unknown = [n for n in names if n not in ch_names]
+    if unknown:
+        raise ValueError(f"unknown channel name(s): {unknown}")
+    rows = [ch_names.index(n) for n in names]
+    return data[rows, :]
