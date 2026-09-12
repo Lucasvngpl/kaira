@@ -63,6 +63,10 @@ export const uploadBaseline = (id, file) => {
     .then((r) => r.data);
 };
 
+// The baseline bundled for demo day.
+export const useDefaultBaseline = (id) =>
+  client.post(`/session/${id}/baseline-default`, null, { timeout: 60000 }).then((r) => r.data);
+
 // Reuse the baseline recorded by an earlier session on this server.
 export const reuseBaseline = (id) =>
   client.post(`/session/${id}/baseline-reuse`).then((r) => r.data);

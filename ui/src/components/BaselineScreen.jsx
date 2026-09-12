@@ -2,7 +2,7 @@
 // done. Each poll also makes the backend take one baseline sample, so this
 // polling IS the measurement - stop polling and the baseline goes deaf.
 import { useRef, useState } from 'react';
-import { getBaselineStatus, skipBaseline, reuseBaseline, uploadBaseline, errorText } from '../api.js';
+import { getBaselineStatus, skipBaseline, reuseBaseline, uploadBaseline, useDefaultBaseline, errorText } from '../api.js';
 import usePoll from '../hooks/usePoll.js';
 import '../styles/session.css';
 
@@ -10,6 +10,7 @@ export default function BaselineScreen({ sessionId, seconds, canSkip, onDone }) 
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState('');
   const [previousAvailable, setPreviousAvailable] = useState(false);
+  const [defaultName, setDefaultName] = useState(null);
   const [uploading, setUploading] = useState(false);
   const fileRef = useRef(null);
   const firedRef = useRef(false); // onDone must fire once, not once per poll
@@ -29,6 +30,7 @@ export default function BaselineScreen({ sessionId, seconds, canSkip, onDone }) 
         const st = await getBaselineStatus(sessionId);
         setProgress(st.progress);
         setPreviousAvailable(Boolean(st.previous_available));
+        setDefaultName(st.default_baseline || null);
         if (st.done) finish(st);
         setError('');
       } catch (e) {
@@ -55,6 +57,18 @@ export default function BaselineScreen({ sessionId, seconds, canSkip, onDone }) 
       finish(await reuseBaseline(sessionId));
     } catch (e) {
       setError(errorText(e));
+    }
+  };
+
+  const adoptDefault = async () => {
+    setUploading(true);
+    setError('');
+    try {
+      finish(await useDefaultBaseline(sessionId));
+    } catch (e) {
+      setError(errorText(e));
+    } finally {
+      setUploading(false);
     }
   };
 
@@ -107,6 +121,11 @@ export default function BaselineScreen({ sessionId, seconds, canSkip, onDone }) 
         {/* Demo-only escape hatch for UI testing; the server refuses it on
             real hardware, so a patient session can never lose its baseline. */}
         <div className="sn-baseline__actions">
+          {defaultName && (
+            <button className="kr-btn" onClick={adoptDefault} disabled={uploading}>
+              Use {defaultName}'s baseline
+            </button>
+          )}
           {previousAvailable && (
             <button className="kr-btn" onClick={reuse}>
               Use previous baseline

@@ -317,6 +317,8 @@ def baseline_status(session_id: str) -> dict:
     st["previous_available"] = any(
         s.id != session_id and s._baseline_done for s in sessions.values()
     )
+    # First name off the bundled file, e.g. "James", for the button label.
+    st["default_baseline"] = DEFAULT_BASELINE.stem.split("_")[1] if DEFAULT_BASELINE.exists() else None
     return st
 
 
@@ -344,17 +346,11 @@ def task_start(session_id: str, req: TaskStartRequest) -> dict:
     return {"ok": True}
 
 
-@app.post("/session/{session_id}/baseline-file")
-async def baseline_file(session_id: str, file: UploadFile) -> dict:
-    """Adopt a baseline from an uploaded resting recording (.cnt from the
-    eego software, .npz from tools/record.py): run it through the real
-    pipeline and take its mean/wobble as this session's baseline."""
-    me = _get(session_id)
-    raw = await file.read()
-    suffix = Path(file.filename or "").suffix.lower()
-    tmp = Path(tempfile.gettempdir()) / f"kaira-baseline{suffix}"
-    tmp.write_bytes(raw)
-    try:
+DEFAULT_BASELINE = Path(__file__).resolve().parent.parent / "baselines" / "H_James_2026-09-12_19-10-52.cnt"
+
+
+def _adopt_baseline_file(me: Session, tmp: Path, suffix: str) -> dict:
+    if True:
         if suffix == ".npz":
             d = np.load(tmp, allow_pickle=False)
             windows, fs, names = d["windows"], int(d["fs"]), [str(c) for c in d["ch_names"]]
@@ -387,9 +383,14 @@ async def baseline_file(session_id: str, file: UploadFile) -> dict:
             raise HTTPException(status_code=400, detail=f"unsupported file type {suffix!r} - drop a .cnt, .xdf or .npz recording")
 
         preprocess.calibrate(data[:, : min(fs * 20, data.shape[1])], fs, names)
+        # The settled tail only (last 90 s): electrodes drift early in a
+        # recording, and James's file showed +0.7 log units of it - using
+        # the whole file would bias every later z. Mirrors the live
+        # protocol, which also discounts the unsettled start.
+        tail_start = max(0.0, data.shape[1] / fs - 90.0)
         win = fs * 2
         loads = []
-        for start in range(0, data.shape[1] - win + 1, win):
+        for start in range(int(tail_start * fs), data.shape[1] - win + 1, win):
             cleaned, trusted = preprocess.clean(data[:, start : start + win], fs, names)
             if trusted:
                 loads.append(features.cognitive_load(cleaned, fs, names))
@@ -399,8 +400,30 @@ async def baseline_file(session_id: str, file: UploadFile) -> dict:
         return me.adopt_baseline_values(
             statistics.fmean(loads), statistics.stdev(loads), data.shape[1] / fs
         )
+
+
+@app.post("/session/{session_id}/baseline-file")
+async def baseline_file(session_id: str, file: UploadFile) -> dict:
+    """Adopt a baseline from an uploaded resting recording (.cnt / .xdf /
+    .npz): the real pipeline runs on it and its settled tail becomes this
+    session's baseline."""
+    me = _get(session_id)
+    raw = await file.read()
+    suffix = Path(file.filename or "").suffix.lower()
+    tmp = Path(tempfile.gettempdir()) / f"kaira-baseline{suffix}"
+    tmp.write_bytes(raw)
+    try:
+        return _adopt_baseline_file(me, tmp, suffix)
     finally:
         tmp.unlink(missing_ok=True)
+
+
+@app.post("/session/{session_id}/baseline-default")
+def baseline_default(session_id: str) -> dict:
+    """The baseline bundled for demo day (James's 3-minute rest)."""
+    if not DEFAULT_BASELINE.exists():
+        raise HTTPException(status_code=404, detail="no bundled baseline in baselines/")
+    return _adopt_baseline_file(_get(session_id), DEFAULT_BASELINE, DEFAULT_BASELINE.suffix)
 
 
 @app.post("/session/{session_id}/baseline-reuse")
