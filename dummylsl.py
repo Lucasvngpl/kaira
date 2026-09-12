@@ -2,30 +2,25 @@ import time
 import random
 from pylsl import StreamInfo, StreamOutlet
 
-def create_64ch_dummy_lsl():
-    # 1. Provide your exact 64-channel layout
+def create_24ch_dummy_lsl():
+    # 24 channel layout updated to match EE-511 layout. Works perfectly with the web app.
     ch_names: list[str] = [
-        "Fp1", "Fpz", "Fp2", "F7", "F3", "Fz", "F4", "F8",
-        "FC5", "FC1", "FC2", "FC6", "M1", "T7", "C3", "Cz",
-        "C4", "T8", "M2", "CP5", "CP1", "CP2", "CP6", "P7",
-        "P3", "Pz", "P4", "P8", "POz", "O1", "O2", "EOG",
-        "AF7", "AF3", "AF4", "AF8", "F5", "F1", "F2", "F6",
-        "FC3", "FCz", "FC4", "C5", "C1", "C2", "C6", "CP3",
-        "CP4", "P5", "P1", "P2", "P6", "PO5", "PO3", "PO4",
-        "PO6", "FT7", "FT8", "TP7", "TP8", "PO7", "PO8", "Oz",
+        "Fp1", "Fp2", "F9", "F7", "F3", "Fz", "F4", "F8", "F10", 
+    "T7", "C3", "Cz", "C4", "T8", "P7", "P3", "Pz", "P4", "P8", 
+    "O1", "Oz", "O2", "CPz", "M1",
     ]
     
     # 2. Base Stream Setup (dynamically reading the list length)
-    name = 'DummyEEG_64Ch'
+    name = 'DummyEEG_24Ch'
     stream_type = 'EEG'
-    channels = len(ch_names)  # Automatically sets to 64
+    channels = len(ch_names)  # Automatically sets to 24
     sample_rate = 512.0  # match the real EE-511 config so rehearsals are faithful
     data_type = 'float32'
-    unique_id = 'dummy_64ch_eeg_98765'
+    unique_id = 'dummy_24ch_eeg_98765'
 
     info = StreamInfo(name, stream_type, channels, sample_rate, data_type, unique_id)
 
-    # 3. Inject the 64-channel pinout metadata
+    # 3. Inject the 24-channel pinout metadata
     desc = info.desc()
     chns = desc.append_child("channels")
     
@@ -61,7 +56,7 @@ def create_64ch_dummy_lsl():
             outlet.push_chunk(chunk)
             time.sleep(chunk_size / sample_rate)
     except KeyboardInterrupt:
-        print("\n64-channel stream stopped.")
+        print("\n24-channel stream stopped.")
 
 if __name__ == '__main__':
-    create_64ch_dummy_lsl()
+    create_24ch_dummy_lsl()
