@@ -1,7 +1,10 @@
-brainflow
-mne
-antio
-scipy
 numpy
+scipy
 fastapi
 uvicorn
+python-multipart   # baseline-file upload endpoint
+pylsl              # LSL receive - the venue transport
+meegkit            # ASR artifact repair (asrpy is broken on numpy 2)
+mne                # reads .cnt recordings (validation + uploaded baselines)
+antio              # mne's ANT .cnt backend
+brainflow          # direct-amp fallback path only
