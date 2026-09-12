@@ -241,7 +241,12 @@ class Session:
         return abs(statistics.fmean(recent) - statistics.fmean(previous)) < BASELINE_TOLERANCE
 
     def _finalize_baseline(self, elapsed: float, stable: bool) -> None:
-        values = [v for _, v in self._baseline_samples]
+        # The ruler comes from the settled tail (last 90 s), same rule as
+        # uploaded baseline files: electrodes drift early in a recording
+        # (James's showed +0.7 log units), and averaging the drift in would
+        # bias every later z. Short rehearsal baselines use everything.
+        cutoff = max(0.0, elapsed - 90.0)
+        values = [v for t, v in self._baseline_samples if t >= cutoff]
         if not values:  # client never polled; one sample beats none
             values = [self._sample()[0]]
         self.state.baseline = statistics.fmean(values)
