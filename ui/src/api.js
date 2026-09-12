@@ -51,6 +51,18 @@ export const getNextTask = (id) => client.get(`/session/${id}/next-task`).then((
 export const postTaskStart = (id, task_id) =>
   client.post(`/session/${id}/task-start`, { task_id }).then((r) => r.data);
 
+// Adopt a baseline from a dropped recording (.cnt from eego, .npz from record.py).
+export const uploadBaseline = (id, file) => {
+  const form = new FormData();
+  form.append('file', file);
+  return client
+    .post(`/session/${id}/baseline-file`, form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: 60000, // parsing a recording takes longer than a poll
+    })
+    .then((r) => r.data);
+};
+
 // Reuse the baseline recorded by an earlier session on this server.
 export const reuseBaseline = (id) =>
   client.post(`/session/${id}/baseline-reuse`).then((r) => r.data);

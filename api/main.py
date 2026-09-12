@@ -18,7 +18,7 @@ import sys
 from pathlib import Path
 from typing import Literal
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
@@ -29,10 +29,15 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "python"))
 
 import math
 import socket
+import tempfile
 import threading
 import time
 
+import numpy as np  # noqa: E402
+
 import decide  # noqa: E402
+import features  # noqa: E402
+import preprocess  # noqa: E402
 import session as session_mod  # noqa: E402
 import stream  # noqa: E402
 import tasks  # noqa: E402
@@ -317,6 +322,49 @@ class TaskStartRequest(BaseModel):
 def task_start(session_id: str, req: TaskStartRequest) -> dict:
     _get(session_id).start_task(req.task_id)
     return {"ok": True}
+
+
+@app.post("/session/{session_id}/baseline-file")
+async def baseline_file(session_id: str, file: UploadFile) -> dict:
+    """Adopt a baseline from an uploaded resting recording: the .cnt the
+    eego software writes, or an .npz from tools/record.py. The file is
+    pushed through the real pipeline (clean, trust, load per 2 s window)
+    and its mean/wobble become this session's baseline."""
+    me = _get(session_id)
+    raw = await file.read()
+    suffix = Path(file.filename or "").suffix.lower()
+    tmp = Path(tempfile.gettempdir()) / f"kaira-baseline{suffix}"
+    tmp.write_bytes(raw)
+    try:
+        if suffix == ".npz":
+            d = np.load(tmp, allow_pickle=False)
+            windows, fs, names = d["windows"], int(d["fs"]), [str(c) for c in d["ch_names"]]
+            data = np.concatenate(list(windows), axis=1)
+        elif suffix == ".cnt":
+            try:
+                import mne
+            except ImportError:
+                raise HTTPException(status_code=400, detail="reading .cnt needs mne on this machine: pip install mne")
+            r = mne.io.read_raw_ant(tmp, preload=True, verbose="ERROR")
+            data, fs, names = r.get_data() * 1e6, int(r.info["sfreq"]), r.ch_names
+        else:
+            raise HTTPException(status_code=400, detail=f"unsupported file type {suffix!r} - drop a .cnt or .npz recording")
+
+        preprocess.calibrate(data[:, : min(fs * 20, data.shape[1])], fs, names)
+        win = fs * 2
+        loads = []
+        for start in range(0, data.shape[1] - win + 1, win):
+            cleaned, trusted = preprocess.clean(data[:, start : start + win], fs, names)
+            if trusted:
+                loads.append(features.cognitive_load(cleaned, fs, names))
+        if len(loads) < 5:
+            raise HTTPException(status_code=400, detail=f"only {len(loads)} trusted windows in that file - too little to be a baseline")
+        import statistics
+        return me.adopt_baseline_values(
+            statistics.fmean(loads), statistics.stdev(loads), data.shape[1] / fs
+        )
+    finally:
+        tmp.unlink(missing_ok=True)
 
 
 @app.post("/session/{session_id}/baseline-reuse")

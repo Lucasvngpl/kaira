@@ -259,6 +259,17 @@ class Session:
         self.baseline_stable = stable
         self._baseline_done = True
 
+    def adopt_baseline_values(self, mean: float, sd: float, seconds: float) -> dict:
+        """Install a baseline computed elsewhere (an uploaded recording of
+        this patient resting). Values arrive in log units, like everything."""
+        self.state.baseline = mean
+        self.state.baseline_sd = max(sd, BASELINE_SD_FLOOR)
+        self.baseline_seconds = seconds
+        self.baseline_stable = True
+        self._calibrated = True  # the upload path calibrates preprocess on the file
+        self._baseline_done = True
+        return self.baseline_status()
+
     def adopt_baseline(self, other: "Session") -> dict:
         """Reuse a baseline already recorded in this process (same patient,
         cap untouched): the zero point, the wobble, and the stability verdict

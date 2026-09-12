@@ -2,7 +2,7 @@
 // done. Each poll also makes the backend take one baseline sample, so this
 // polling IS the measurement - stop polling and the baseline goes deaf.
 import { useRef, useState } from 'react';
-import { getBaselineStatus, skipBaseline, reuseBaseline, errorText } from '../api.js';
+import { getBaselineStatus, skipBaseline, reuseBaseline, uploadBaseline, errorText } from '../api.js';
 import usePoll from '../hooks/usePoll.js';
 import '../styles/session.css';
 
@@ -10,6 +10,8 @@ export default function BaselineScreen({ sessionId, seconds, canSkip, onDone }) 
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState('');
   const [previousAvailable, setPreviousAvailable] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const fileRef = useRef(null);
   const firedRef = useRef(false); // onDone must fire once, not once per poll
 
   // Hand the outcome up: how long it really ran, and whether the signal
@@ -54,6 +56,19 @@ export default function BaselineScreen({ sessionId, seconds, canSkip, onDone }) 
     }
   };
 
+  const adoptFile = async (file) => {
+    if (!file) return;
+    setUploading(true);
+    setError('');
+    try {
+      finish(await uploadBaseline(sessionId, file));
+    } catch (e) {
+      setError(errorText(e));
+    } finally {
+      setUploading(false);
+    }
+  };
+
   const remaining = Math.max(0, Math.ceil(seconds * (1 - progress)));
   // "About 2:54 left" reads better than "About 174 s left" now that the
   // protocol baseline is three minutes; short rehearsal baselines keep seconds.
@@ -64,7 +79,16 @@ export default function BaselineScreen({ sessionId, seconds, canSkip, onDone }) 
 
   return (
     <div className="sn-baseline kr-reveal">
-      <div className="kr-card sn-baseline__card" role="status" aria-live="polite">
+      <div
+        className="kr-card sn-baseline__card"
+        role="status"
+        aria-live="polite"
+        onDragOver={(e) => e.preventDefault()}
+        onDrop={(e) => {
+          e.preventDefault();
+          adoptFile(e.dataTransfer.files?.[0]);
+        }}
+      >
         <h2 className="sn-baseline__title">Recording resting baseline</h2>
         <p className="sn-baseline__sub">
           Ask the patient to sit still, relax, and keep their eyes open. The first task starts
@@ -86,12 +110,24 @@ export default function BaselineScreen({ sessionId, seconds, canSkip, onDone }) 
               Use previous baseline
             </button>
           )}
+          <button className="kr-btn" onClick={() => fileRef.current?.click()} disabled={uploading}>
+            {uploading ? 'Reading recording…' : 'Use a recorded baseline…'}
+          </button>
           {canSkip && (
             <button className="kr-btn" onClick={skip}>
               Skip baseline (demo)
             </button>
           )}
         </div>
+        {/* Hidden input: the button opens the file dialog; dropping a file
+            anywhere on the card works too. */}
+        <input
+          ref={fileRef}
+          type="file"
+          accept=".cnt,.npz"
+          hidden
+          onChange={(e) => adoptFile(e.target.files?.[0])}
+        />
         {error && (
           <p className="kr-error" role="alert">
             {error}
