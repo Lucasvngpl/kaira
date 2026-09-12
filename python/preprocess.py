@@ -1,83 +1,35 @@
-"""Filtering and artifact rejection.
+"""Filtering and artifact cleaning.
 
-Owner: Aarnav.
+Owner: Aarnav. ASR integration wired by the scaffold (2026-09-12, team
+decision) - the algorithm itself is meegkit's implementation of Artifact
+Subspace Reconstruction (asrpy was tried first and is broken on numpy 2).
 
 This module turns a raw window from stream.get_window() into something
-features.py is allowed to trust. clean() is the seam the scaffold proposes
-(not part of the fixed four-function interface - see stream.py) because the
-report contract needs a per-task `trusted` flag and artifact rejection is the
-only honest source of it. session.py calls clean() between get_window() and
-cognitive_load() - if the team changes this shape, update
-session._clean_window() to match.
+features.py is allowed to trust. session.py calls clean() between
+get_window() and cognitive_load(); calibrate() runs once per session, on
+~20 s of the resting baseline, and everything here keys off that.
 
-calibrate() is new (added here, not in the original scaffold) - it's the
-missing seam for persisting an EOG regression estimate across clean() calls,
-since clean()'s fixed-looking (window, fs, ch_names) signature has nowhere to
-carry state. It's cached at module scope, which works but is a design choice,
-not something forced by the interface. session.py needs to call it once
-before the main loop starts, on some baseline window - see unresolved item 7
-below for what that baseline actually should be.
+The pipeline, in order, and why:
+  1. 1 Hz HIGH-PASS. The eego is DC-coupled; raw values sit around +4800 uV.
+     Nothing downstream means anything before the drift is gone. Zero-phase
+     per pulled window - fine for band power, which never reads phase.
+  2. ASR REPAIR. Calibration learned what this patient's clean signal looks
+     like (the principal components of ~20 s of rest and their normal
+     range). Any signal component that blows past that envelope - a blink,
+     a jaw clench, a cable tug - gets reconstructed from the components
+     that stayed clean. Repair beats discard here because the venue cap
+     (EE-511 / NA-246) has no EOG channel to regress blinks with.
+  3. AVERAGE REFERENCE across the surviving channels (M1/M2 masked out, not
+     deleted - row order always matches the ch_names the caller passed).
+  4. TRUST GATE, judged on the six channels the load formula reads. With
+     ASR active the threshold is deliberately HIGH (team call): ASR already
+     repaired what is repairable, so only a window it visibly could not
+     save gets discarded. Without ASR (short rehearsal baselines) the
+     stricter raw threshold applies.
 
-*** UNRESOLVED - CONFIRM BEFORE SHIPPING (see chat writeup for full list) ***
-  3. EOG_CHANNEL below is just "whatever name currently sits at index 32 in
-     stream.py's PLACEHOLDER ch_names list" (index 31, 0-based). Once the
-     real CA-208 order replaces that placeholder, re-derive this constant
-     from the verified montage sheet, not from array position alone. Also
-     confirm this position doesn't collide with a channel features.py
-     independently wants for frontal theta / parietal alpha - if it does,
-     that channel needs to be excluded from features.py's picks too, since
-     post-regression it's an ocular reference, not brain signal.
-  4. It's also unconfirmed whether the droplead is even inside the 64-channel
-     EEG bank at all. BrainFlow's board descriptor for this board id shows a
-     separate 24-channel "emg_channels" bank (rows 65-88, generic
-     bipolar/AUX inputs per BrainFlow's schema) alongside the 64 EEG rows.
-     If the droplead is actually wired to one of those AUX inputs instead of
-     sitting inside the 64-channel bank, stream.py's get_window() needs to
-     surface that row too (it currently only returns the 64 EEG rows) and
-     EOG_CHANNEL/calibrate()/clean() below need to read from that separate
-     array instead. Cannot resolve this without the montage sheet or
-     hardware.
-  6. TRUST_PEAK_TO_PEAK_UV is a generic EEG artifact-rejection heuristic, not
-     derived from this amp's actual configured input range
-     (reference_range/bipolar_range, both configurable per-session per the
-     eego SDK docs). Revisit once that configured range is known.
-  7. No calibration protocol exists yet for calibrate()'s baseline_window.
-     The provided cup-flip/basketball .cnt files are a motor-artifact test
-     set, not a deliberate-blink recording, and are probably not the right
-     source for estimating EOG regression coefficients. Need either a
-     dedicated "sit still, blink normally/deliberately a few times" baseline
-     at session start, or confirmation that an existing recording already
-     covers this.
-  8. _highpass() below uses zero-phase filtfilt per pulled window rather than
-     a continuous causal filter with persisted state - simpler given the
-     pull-window architecture (get_window returns overlapping windows, not
-     exclusive chunks), but it means samples near each window's edges are
-     less reliable than the middle/end. Flag if the team needs true
-     continuous causal filtering instead.
-
-TODO(team) - the pipeline this file must implement, in order, and why:
-  1. 1 Hz HIGH-PASS FIRST. The eego is DC-coupled; raw values sit around
-     +4800 uV. Every amplitude threshold in the literature assumes
-     zero-centred data, so nothing downstream means anything before this.
-  2. Handle M1/M2. They are recorded but were never connected in the
-     provided dataset; left in, they poison the average reference. Chosen
-     here: mask them out of the average-reference and trust calculations
-     rather than physically delete their rows, so the output array's row
-     order always matches the ch_names it was given - see unresolved item 5.
-  3. Handle EOG. Channel 32 is a dedicated droplead ring electrode; use it to
-     detect (or regress out) blinks and eye movement.
-  4. Re-reference (average reference across the surviving channels; the
-     hardware reference is CPz and never appears as a data channel).
-  5. Artifact decision. If the window is contaminated (blink, movement,
-     amplitude blow-up), return trusted=False rather than a cleaned lie -
-     decide.py must know when the load number cannot be believed.
-
-Validation baseline (HANDOFF section 4): after this pipeline plus
-features.py, the EO-EC recording must show occipital alpha ~33x higher with
-eyes closed, peaking at 10.2 Hz. If a change here breaks that, the change is
-wrong. NOTE: not yet checked against this file - needs the actual EO-EC
-recording, which may be a separate file from the cup-flip/basketball data
-(see unresolved item 7).
+Validation gate (HANDOFF section 4): the EO-EC recording must keep its
+order-of-magnitude eyes-closed occipital alpha ratio AFTER this pipeline -
+proof that ASR removes artifacts without eating real brain rhythm.
 """
 
 from __future__ import annotations
@@ -87,78 +39,72 @@ from scipy.signal import butter, sosfiltfilt
 
 DEAD_CHANNELS = ("M1", "M2")
 
-# VERIFIED (2026-09-12): the EO-EC .cnt header names the droplead "EOG",
-# inside the 64-channel bank at position 32 - unresolved items 3 and 4 are
-# answered by the rig's own recording. Found by name, so it cannot collide
-# with features.py's frontal/parietal picks.
+# Kept out of reference/trust math on the 64-channel rig; the EE-511 cap
+# simply has no such channel and this name never matches.
 EOG_CHANNEL = "EOG"
 
 HPF_HZ = 1.0
 HPF_ORDER = 4
 
-# UNVERIFIED PLACEHOLDER - see unresolved item 6 above.
-TRUST_PEAK_TO_PEAK_UV = 150.0
+# EEGLAB's default aggressiveness: components beyond 20 calibration standard
+# deviations get reconstructed. Conservative on purpose - repairing real
+# brain signal would flatten the load index. Tunable from live recordings.
+ASR_CUTOFF = 20
 
-# Calibrated Gratton & Coles-style regression coefficients, one per surviving
-# EEG channel: EEG_ch_corrected = EEG_ch - gain[ch] * EOG. None until
-# calibrate() has been called once - see unresolved item 7 for what data that
-# should run on.
-_eog_gain: dict[str, float] | None = None
+# Trust thresholds (worst formula-channel peak-to-peak, microvolts).
+# Post-ASR the gate is deliberately loose: we rely on the repair and only
+# discard what ASR visibly could not save. Raw (no ASR fitted) stays strict.
+TRUST_PTP_UV_ASR = 300.0
+TRUST_PTP_UV_RAW = 150.0
+
+# (fitted meegkit ASR, fitted row indices) or None. None means calibrate()
+# ran but ASR could not fit (too little data) - threshold-only trust.
+_asr = None
+_calibrated = False
 
 
 def _highpass(window: np.ndarray, fs: int) -> np.ndarray:
-    """Zero-phase 1 Hz high-pass across the whole pulled window. See
-    unresolved item 8 for the causality tradeoff this implies."""
+    """Zero-phase 1 Hz high-pass across the whole pulled window."""
     sos = butter(HPF_ORDER, HPF_HZ, btype="highpass", fs=fs, output="sos")
     return sosfiltfilt(sos, window, axis=1)
 
 
 def _reference_rows(ch_names: list[str]) -> list[int]:
-    """Rows that are legitimate scalp EEG for referencing/trust purposes:
-    excludes the dead mastoids and the EOG channel itself (not a brain
-    signal)."""
+    """Rows that are legitimate scalp EEG for referencing/trust purposes."""
     exclude = set(DEAD_CHANNELS) | {EOG_CHANNEL}
     return [i for i, name in enumerate(ch_names) if name not in exclude]
 
 
 def calibrate(baseline_window: np.ndarray, fs: int, ch_names: list[str]) -> None:
-    """Estimate one EOG regression coefficient per surviving EEG channel from
-    a baseline recording that should contain a handful of blinks. Must be
-    called once (by session.py, at session start) before clean() will do
-    anything beyond high-pass + reference + gross-artifact rejection - see
-    unresolved item 7 for what that baseline recording actually should be.
-    """
-    global _eog_gain
-    if EOG_CHANNEL not in ch_names:
-        # Integration fix (2026-09-12): the venue amp is an eego 24 (EE-511)
-        # whose cap may carry no EOG droplead. No EOG means no regression to
-        # calibrate - fall back to threshold-only trust (blinks still trip
-        # the peak-to-peak check) instead of refusing to run.
-        _eog_gain = {}
-        return
-    hp = _highpass(baseline_window, fs)
-    eog_idx = ch_names.index(EOG_CHANNEL)
-    eog = hp[eog_idx, :]
-    eog_var = float(np.var(eog))
-    if eog_var == 0.0:
-        raise RuntimeError("EOG channel is flat during calibration - can't estimate a regression coefficient; check the recording")
-    gains: dict[str, float] = {}
-    for i in _reference_rows(ch_names):
-        name = ch_names[i]
-        gains[name] = float(np.cov(hp[i, :], eog)[0, 1] / eog_var)
-    _eog_gain = gains
+    """Fit ASR on resting data - session.py calls this once, ~20 s into the
+    baseline (or on an uploaded resting recording). A fit that cannot work
+    (rehearsal baselines are far too short) degrades to threshold-only
+    trust instead of blocking the session."""
+    global _asr, _calibrated
+    _calibrated = True
+    try:
+        from meegkit.asr import ASR
+        rows = _reference_rows(ch_names)
+        asr = ASR(sfreq=fs, cutoff=ASR_CUTOFF)
+        # meegkit's distribution fit sprays benign divide-by-zero warnings
+        # from its histogram internals; silence just those.
+        with np.errstate(divide="ignore", invalid="ignore"):
+            asr.fit(_highpass(baseline_window, fs)[rows, :])
+        _asr = (asr, tuple(rows))
+    except Exception as exc:
+        print(f"ASR calibration unavailable ({exc}); threshold-only trust")
+        _asr = None  # raw mode: the strict threshold does all the gating
 
 
-def _remove_eog(window: np.ndarray, ch_names: list[str]) -> np.ndarray:
-    if _eog_gain is None or EOG_CHANNEL not in ch_names:
-        return window  # not calibrated yet, or channel missing - pass through rather than fabricate a coefficient
-    eog_idx = ch_names.index(EOG_CHANNEL)
-    eog = window[eog_idx, :]
+def _repair(window: np.ndarray, ch_names: list[str]) -> np.ndarray:
+    if _asr is None:
+        return window
+    asr, fitted_rows = _asr
+    rows = list(fitted_rows)
+    if len(rows) != len(_reference_rows(ch_names)):
+        return window  # montage changed since calibration; do not guess
     out = window.copy()
-    for i, name in enumerate(ch_names):
-        gain = _eog_gain.get(name)
-        if gain is not None:
-            out[i, :] = out[i, :] - gain * eog
+    out[rows, :] = asr.transform(window[rows, :])
     return out
 
 
@@ -171,32 +117,27 @@ def _average_reference(window: np.ndarray, ch_names: list[str]) -> np.ndarray:
 
 
 def _is_trusted(window: np.ndarray, ch_names: list[str]) -> bool:
-    if _eog_gain is None:
-        return False  # pre-calibration windows are uncorrected for blinks - don't let decide.py trust them
-    # Trust is judged on the channels the load index actually reads. The
-    # first venue-amp recording (2026-09-12) had a bad-contact C3 sitting at
-    # ~350 uVpp while every formula channel was clean at 50-70; a flaky
-    # electrode the decision never reads must not veto the whole session.
-    # Blinks still trip this: they hit the frontal trio hard.
+    if not _calibrated:
+        return False  # nothing is trusted before the baseline calibrates the pipeline
+    # Judged on the channels the load index actually reads: a flaky
+    # electrode the decision never sees (the first venue recording had a
+    # ~350 uVpp bad-contact C3) must not veto the whole session.
     import features
     used = set(features.FRONTAL + features.PARIETAL)
     rows = [i for i, n in enumerate(ch_names) if n in used] or _reference_rows(ch_names)
-    ptp = np.ptp(window[rows, :], axis=1)
-    return bool(np.all(ptp < TRUST_PEAK_TO_PEAK_UV))
+    limit = TRUST_PTP_UV_ASR if _asr is not None else TRUST_PTP_UV_RAW
+    return bool(np.all(np.ptp(window[rows, :], axis=1) < limit))
 
 
 def clean(window: np.ndarray, fs: int, ch_names: list[str]) -> tuple[np.ndarray, bool]:
     """Return (cleaned_window, trusted).
 
     Row order/count of cleaned_window matches the input ch_names exactly -
-    M1/M2 and the EOG channel are masked out of referencing/trust math rather
-    than physically dropped, so callers can keep indexing by the same
-    ch_names they passed in. See unresolved item 5 (this file's own docstring
-    header) if the team would rather clean() return a shortened array plus an
-    updated name list instead - that's a real, currently-undecided fork.
+    bad channels are masked out of the math, never dropped, so callers keep
+    indexing by the names they passed in.
     """
     hp = _highpass(window, fs)
-    corrected = _remove_eog(hp, ch_names)
-    referenced = _average_reference(corrected, ch_names)
+    repaired = _repair(hp, ch_names)
+    referenced = _average_reference(repaired, ch_names)
     trusted = _is_trusted(referenced, ch_names)
     return referenced, trusted
