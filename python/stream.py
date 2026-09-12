@@ -88,11 +88,16 @@ def _connect_lsl() -> None:
     samples into a ring buffer on a background thread. get_window() then
     reads the most recent slice, same contract as every other source."""
     global fs, ch_names, _lsl_ring, _lsl_write, _lsl_filled
-    from pylsl import StreamInlet, resolve_byprop
+    from pylsl import StreamInlet, resolve_byprop, resolve_streams
 
+    # The eego host SHOULD declare type EEG; if it labels itself differently
+    # (LabRecorder showed the stream named "EE511-..."), fall back to any
+    # multi-channel stream rather than failing on a metadata nicety.
     found = resolve_byprop("type", "EEG", timeout=10.0)
     if not found:
-        raise RuntimeError("no LSL stream of type EEG found - is 'enable LSL' on in the eego software, and are both machines on the same network?")
+        found = [s for s in resolve_streams(wait_time=5.0) if s.channel_count() >= 8]
+    if not found:
+        raise RuntimeError("no LSL stream found - is 'enable LSL' on in the eego software, and are both machines on the same network?")
     inlet = StreamInlet(found[0], max_buflen=60)
     info = inlet.info()
     fs = int(round(info.nominal_srate()))
