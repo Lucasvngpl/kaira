@@ -645,6 +645,7 @@
 
 .sn-seg {
   display: inline-flex;
+  align-self: flex-start; /* the field column stretches children; a pill must hug its options */
   border: 0.5px solid var(--ink);
   border-radius: 999px;
   overflow: hidden;
