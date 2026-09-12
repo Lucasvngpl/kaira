@@ -46,7 +46,19 @@ session_mod.BASELINE_SECONDS = float(
     os.environ.get("KAIRA_BASELINE_SECONDS", session_mod.BASELINE_SECONDS)
 )
 
-app = FastAPI(title="Kaira", description="Adaptive cognitive assessment - demo API")
+from contextlib import asynccontextmanager
+
+
+@asynccontextmanager
+async def _lifespan(app: FastAPI):
+    # Real amplifier only: opens the BrainFlow session (no-op when synthetic).
+    # Runs after the env/CLI have settled SYNTHETIC, which import time cannot.
+    stream.connect()
+    yield
+    stream.release()
+
+
+app = FastAPI(title="Kaira", description="Adaptive cognitive assessment - demo API", lifespan=_lifespan)
 
 # The React dev server is the only client; keep CORS scoped to it.
 app.add_middleware(

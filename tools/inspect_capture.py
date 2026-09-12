@@ -26,11 +26,21 @@ import preprocess  # noqa: E402
 OCCIPITAL = ["O1", "Oz", "O2", "POz"]
 
 
+_calibrated = False
+
+
 def analyse(path: str):
+    global _calibrated
     d = np.load(path, allow_pickle=False)
     windows, fs, ch_names = d["windows"], int(d["fs"]), [str(c) for c in d["ch_names"]]
     note = str(d["note"]) if "note" in d else ""
     print(f"\n== {path}  ({windows.shape[0]} windows, fs={fs}, note={note!r})")
+
+    # preprocess trusts nothing until its blink-removal is calibrated; feed
+    # it the first file's whole recording (pass the rest file first).
+    if not _calibrated:
+        preprocess.calibrate(np.concatenate(list(windows), axis=1), fs, ch_names)
+        _calibrated = True
 
     loads, p2ps, occ_alpha, untrusted = [], [], [], 0
     for w in windows:
@@ -46,6 +56,9 @@ def analyse(path: str):
 
     loads, p2ps = np.array(loads), np.array(p2ps)
     print(f"  untrusted windows: {untrusted}")
+    if len(loads) == 0:
+        print("  every window untrusted - lower TRUST_PEAK_TO_PEAK_UV or check the cap")
+        return np.array([]), float("nan")
     print(f"  worst-channel p2p uV   p50={np.percentile(p2ps, 50):.0f}  p90={np.percentile(p2ps, 90):.0f}  p99={np.percentile(p2ps, 99):.0f}")
     print(f"  load (log units)       mean={loads.mean():+.3f}  sd={loads.std(ddof=1):.3f}  min={loads.min():+.3f}  max={loads.max():+.3f}")
     print(f"  occipital alpha power  mean={np.mean(occ_alpha):.3g}")

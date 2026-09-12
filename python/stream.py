@@ -51,23 +51,21 @@ BOARD_ID = BoardIds.SYNTHETIC_BOARD if SYNTHETIC else BoardIds.ANT_NEURO_EE_225_
 
 fs: int = 512  # verified sampling rate of the EE-225; see unresolved item 1 above
 
-# UNVERIFIED PLACEHOLDER - see unresolved item 2 above. This is a plausible
-# 10-10 layout, not the CA-208's true wiring order. CPz (reference) and AFz
-# (ground) are absent on purpose - they never appear as data channels. M1/M2
-# are included and dead in the provided dataset; preprocess.py excludes them
-# from anything that would be poisoned by a flat channel. Position 32 (index
-# 31) is asserted by HANDOFF to be the droplead EOG ring electrode - CONFIRM
-# this survives once the real order replaces this placeholder.
+# VERIFIED ORDER (2026-09-12): read from the header of the EO-EC .cnt in
+# ~/NOVA_ANT via mne.io.read_raw_ant - a recording made on this exact amp
+# and cap, so this is the montage as the rig itself writes it. sfreq in the
+# same header is 512.0, and "EOG" sits at position 32 (index 31), matching
+# HANDOFF. Residual risk: BrainFlow's row order could differ from the .cnt
+# driver's - proven on the day by the eyes-closed alpha check (O1/O2/POz).
 ch_names: list[str] = [
-    "Fp1", "Fpz", "Fp2",
-    "AF7", "AF3", "AF4", "AF8",
-    "F7", "F5", "F3", "F1", "Fz", "F2", "F4", "F6", "F8",
-    "FT7", "FC5", "FC3", "FC1", "FCz", "FC2", "FC4", "FC6", "FT8",
-    "M1", "T7", "C5", "C3", "C1", "Cz", "C2", "C4", "C6", "T8", "M2",
-    "TP7", "CP5", "CP3", "CP1", "CP2", "CP4", "CP6", "TP8",
-    "P7", "P5", "P3", "P1", "Pz", "P2", "P4", "P6", "P8",
-    "PO7", "PO5", "PO3", "POz", "PO4", "PO6", "PO8",
-    "O1", "Oz", "O2", "Iz",
+    "Fp1", "Fpz", "Fp2", "F7", "F3", "Fz", "F4", "F8",
+    "FC5", "FC1", "FC2", "FC6", "M1", "T7", "C3", "Cz",
+    "C4", "T8", "M2", "CP5", "CP1", "CP2", "CP6", "P7",
+    "P3", "Pz", "P4", "P8", "POz", "O1", "O2", "EOG",
+    "AF7", "AF3", "AF4", "AF8", "F5", "F1", "F2", "F6",
+    "FC3", "FCz", "FC4", "C5", "C1", "C2", "C6", "CP3",
+    "CP4", "P5", "P1", "P2", "P6", "PO5", "PO3", "PO4",
+    "PO6", "FT7", "FT8", "TP7", "TP8", "PO7", "PO8", "Oz",
 ]
 
 _rng = np.random.default_rng()  # noise source for the synthetic path only

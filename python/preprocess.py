@@ -87,8 +87,11 @@ from scipy.signal import butter, sosfiltfilt
 
 DEAD_CHANNELS = ("M1", "M2")
 
-# UNVERIFIED PLACEHOLDER - see unresolved items 3 and 4 above.
-EOG_CHANNEL = "C2"
+# VERIFIED (2026-09-12): the EO-EC .cnt header names the droplead "EOG",
+# inside the 64-channel bank at position 32 - unresolved items 3 and 4 are
+# answered by the rig's own recording. Found by name, so it cannot collide
+# with features.py's frontal/parietal picks.
+EOG_CHANNEL = "EOG"
 
 HPF_HZ = 1.0
 HPF_ORDER = 4

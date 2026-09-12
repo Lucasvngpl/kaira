@@ -50,9 +50,17 @@ BASELINE_CHECK_SECONDS = 30.0
 # "Within 10%" on a ratio scale is a log distance, same units as the loads.
 BASELINE_TOLERANCE = math.log(1.10)
 
-# Window length per load sample. 2 s gives the (future, real) Welch estimate
-# enough samples at 512 Hz for stable low-frequency bands.
+# Window length per load sample. 2 s gives the Welch estimate enough
+# samples at 512 Hz for stable low-frequency bands.
 SAMPLE_SECONDS = 2.0
+
+# Aarnav's preprocess refuses to trust ANY window until its blink-removal
+# has been calibrated once, and assigns that call to session.py. We do it
+# early in the resting baseline: by then the patient has sat still and
+# blinked naturally for long enough to estimate the EOG coefficients, and
+# every later baseline sample benefits. Short rehearsal baselines calibrate
+# proportionally earlier on whatever has streamed by then.
+CALIBRATE_AFTER_SECONDS = 20.0
 
 # The live spectrum shown to judges: display plumbing only, the decision
 # never reads it. 2-20 Hz because theta (4-8) and alpha (8-12) are the whole
@@ -140,6 +148,7 @@ class Session:
         self._baseline_t0 = time.monotonic()
         self._baseline_samples: list[tuple[float, float]] = []  # (seconds since start, load)
         self._baseline_done = False
+        self._calibrated = False  # preprocess blink-removal, done once mid-baseline
         self.baseline_seconds = 0.0  # how long the baseline actually ran
         self.baseline_stable = True  # False only when the settling check ran and never passed
         # Task bookkeeping.
@@ -189,6 +198,16 @@ class Session:
 
     # --- baseline -----------------------------------------------------------
 
+    def _ensure_calibrated(self, elapsed: float) -> None:
+        """Run preprocess.calibrate once, as early as enough signal exists.
+        Raises loudly if the EOG channel is flat - a disconnected droplead
+        should stop a session at the baseline, not poison it silently."""
+        due = min(CALIBRATE_AFTER_SECONDS, BASELINE_SECONDS / 2)
+        if self._calibrated or elapsed < due:
+            return
+        preprocess.calibrate(stream.get_window(due), stream.fs, stream.ch_names)
+        self._calibrated = True
+
     def baseline_status(self) -> dict:
         """Poll during the resting baseline; each poll also takes one load sample.
 
@@ -198,6 +217,7 @@ class Session:
         """
         elapsed = time.monotonic() - self._baseline_t0
         if not self._baseline_done:
+            self._ensure_calibrated(elapsed)
             value, trusted = self._sample()
             if trusted:
                 self._baseline_samples.append((elapsed, value))
@@ -245,7 +265,14 @@ class Session:
         baseline is protocol, not a waiting screen.
         """
         if not self._baseline_done:
-            self._finalize_baseline(time.monotonic() - self._baseline_t0, stable=True)
+            elapsed = time.monotonic() - self._baseline_t0
+            if not self._calibrated:
+                # Calibrate on whatever has streamed, so a skipped baseline
+                # still yields trusted windows during the demo tasks.
+                window = stream.get_window(max(2.0, min(elapsed, CALIBRATE_AFTER_SECONDS)))
+                preprocess.calibrate(window, stream.fs, stream.ch_names)
+                self._calibrated = True
+            self._finalize_baseline(elapsed, stable=True)
         return self.baseline_status()
 
     def _require_baseline(self) -> None:
