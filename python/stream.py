@@ -66,7 +66,7 @@ def _connect_lsl(name_prefix: str | None = None) -> None:
     name_prefix narrows to streams whose name starts with it - the UI's
     LIVE mode passes "EE511" so a dummy rehearsal stream can never pass
     as the real amplifier."""
-    global fs, ch_names, _lsl_ring, _lsl_write, _lsl_filled, _lsl_generation, lsl_name
+    global fs, ch_names, _lsl_ring, _lsl_write, _lsl_filled, _lsl_generation, lsl_name, _lsl_keep
     from pylsl import StreamInlet, resolve_streams
 
     # Full scan, never first-answer: resolve_streams waits out the whole
@@ -93,21 +93,37 @@ def _connect_lsl(name_prefix: str | None = None) -> None:
     n_ch = info.channel_count()
     if fs <= 0:
         raise RuntimeError(f"stream {found[0].name()!r} declares no fixed sampling rate - cannot window it; check the eego LSL settings")
-    labels = []
+    labels, types = [], []
     ch = info.desc().child("channels").child("channel")
     while not ch.empty():
         labels.append(ch.child_value("label"))
+        types.append((ch.child_value("type") or "").upper())
         ch = ch.next_sibling("channel")
-    if len(labels) == n_ch:
-        ch_names = labels
-    else:
-        raise RuntimeError(f"LSL stream has {n_ch} channels but {len(labels)} labels - need the pinout metadata to pick channels by name")
+    if len(labels) < n_ch:
+        # eego appends extras (trigger/counter) after the EEG block, often
+        # without labels; keep the labelled head rather than refusing.
+        print(f"LSL: {n_ch} channels but only {len(labels)} labels - keeping the labelled rows")
+        types += [""] * (n_ch - len(labels))
+    # The eego broadcast is not EEG-only (ANT's own example: 63 EEG + EOG +
+    # ECG + EDA + STIM in ONE stream). A trigger or sample-counter row is a
+    # huge ramp that would poison the average reference and ASR, so keep
+    # only rows that are plausibly electrodes.
+    NOT_EEG = ("TRIG", "STIM", "MARKER", "COUNTER", "SAMPLE", "EDA", "ECG", "GSR", "AUX", "BIP", "STATUS")
+    keep = [i for i, lab in enumerate(labels)
+            if lab and not any(k in (types[i] or "").upper() or k in lab.upper() for k in NOT_EEG)]
+    if not keep:
+        raise RuntimeError("no electrode-like channels in the LSL stream metadata - need the pinout")
+    _lsl_keep = keep
+    ch_names = [labels[i] for i in keep]
+    dropped = [labels[i] or f"row{i}" for i in range(len(labels)) if i not in keep] + [f"row{i}" for i in range(len(labels), n_ch)]
     missing = [c for c in ("F3", "Fz", "F4", "P3", "Pz", "P4") if c not in ch_names]
     if missing:
         raise RuntimeError(f"LSL montage is missing {missing} - features.py needs them; check the cap pinout and adjust features.FRONTAL/PARIETAL with the team")
-    print(f"LSL connected: {n_ch} ch @ {fs} Hz, labels {ch_names[:6]}...")
+    print(f"LSL connected: {found[0].name()} @ {fs} Hz - keeping {len(keep)}/{n_ch} rows as electrodes"
+          + (f", dropping {dropped}" if dropped else ""))
+    print(f"  labels: {ch_names}")
 
-    _lsl_ring = np.zeros((n_ch, fs * 60))  # 60 s of history, plenty for a 2 s window
+    _lsl_ring = np.zeros((len(keep), fs * 60))  # 60 s of history, plenty for a 2 s window
     _lsl_write = 0
     _lsl_filled = 0
     _lsl_generation += 1  # a reconnect makes every older pull thread retire itself
@@ -124,24 +140,30 @@ def _connect_lsl(name_prefix: str | None = None) -> None:
         import time as _t
         last_data = _t.monotonic()
         while my_generation == _lsl_generation:
-            chunk, _ = inlet.pull_chunk(timeout=1.0)
-            if not chunk:
-                if _t.monotonic() - last_data > 3.0:
-                    print(f"LSL: no samples from {lsl_name} for {_t.monotonic() - last_data:.0f}s - stream stalled?")
-                    last_data = _t.monotonic()  # log every ~3s, not every loop
-                continue
-            last_data = _t.monotonic()
-            arr = np.asarray(chunk, dtype=float).T  # (n_ch, n_new)
-            with _rec_lock:
-                if _rec["file"] is not None:
-                    arr.T.astype(np.float32).tofile(_rec["file"])
-                    _rec["file"].flush()  # a crash loses at most the in-flight chunk
-            n_new = arr.shape[1]
-            cap = _lsl_ring.shape[1]
-            for k in range(n_new):  # ring write; chunks are small (<= a few hundred samples)
-                _lsl_ring[:, (_lsl_write + k) % cap] = arr[:, k]
-            _lsl_write = (_lsl_write + n_new) % cap
-            _lsl_filled = min(cap, _lsl_filled + n_new)
+            # One bad chunk must never kill this thread: a silently dead
+            # puller means an empty ring and a frozen readout forever.
+            try:
+                chunk, _ = inlet.pull_chunk(timeout=1.0)
+                if not chunk:
+                    if _t.monotonic() - last_data > 3.0:
+                        print(f"LSL: no samples from {lsl_name} for {_t.monotonic() - last_data:.0f}s - stream stalled?")
+                        last_data = _t.monotonic()  # log every ~3s, not every loop
+                    continue
+                last_data = _t.monotonic()
+                arr = np.asarray(chunk, dtype=float).T[_lsl_keep, :]  # electrodes only
+                with _rec_lock:
+                    if _rec["file"] is not None:
+                        arr.T.astype(np.float32).tofile(_rec["file"])
+                        _rec["file"].flush()  # a crash loses at most the in-flight chunk
+                n_new = arr.shape[1]
+                cap = _lsl_ring.shape[1]
+                for k in range(n_new):  # ring write; chunks are small (<= a few hundred samples)
+                    _lsl_ring[:, (_lsl_write + k) % cap] = arr[:, k]
+                _lsl_write = (_lsl_write + n_new) % cap
+                _lsl_filled = min(cap, _lsl_filled + n_new)
+            except Exception as exc:
+                print(f"LSL pull error ({exc}); retrying")
+                _t.sleep(0.5)
         with _rec_lock:
             if _rec["file"] is not None:
                 _rec["file"].close()
@@ -155,6 +177,7 @@ _lsl_ring = None
 _lsl_write = 0
 _lsl_filled = 0
 _lsl_generation = 0
+_lsl_keep: list[int] = []
 lsl_name: str | None = None  # name of the connected LSL stream, for display
 
 import threading
