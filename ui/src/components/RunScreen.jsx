@@ -83,13 +83,15 @@ function LoadSparkline({ samples, band, paused }) {
 }
 
 export default function RunScreen({ session, baseline, band = [0.74, 1.35], onFinished }) {
-  // band prop comes from GET /; the literal (exp of decide.py's +-0.30
-  // thresholds) is only a render fallback while that first fetch is in flight.
+  // The band is personal now (z thresholds times this patient's own wobble)
+  // and rides every live-load response; the prop/literal is only a render
+  // fallback until the first sample lands.
   const [task, setTask] = useState(null);
   const [stage, setStage] = useState('reading'); // reading | running | submitted
   const [outcome, setOutcome] = useState(null); // answer response, shown between tasks
   const [lastResult, setLastResult] = useState('');
   const [live, setLive] = useState(null); // {load, trusted}, most recent sample
+  const [liveBand, setLiveBand] = useState(null); // this patient's own band, from the server
   const [samples, setSamples] = useState([]); // rolling window for the sparkline
   const [elapsed, setElapsed] = useState(0);
   const [busy, setBusy] = useState(false);
@@ -128,6 +130,7 @@ export default function RunScreen({ session, baseline, band = [0.74, 1.35], onFi
       try {
         const sample = await getLiveLoad(session.id);
         setLive(sample);
+        if (sample.band) setLiveBand(sample.band);
         setSamples((prev) => [...prev, sample].slice(-SPARK_CAP));
       } catch {
         // Keep the last good reading; the next poll catches up.

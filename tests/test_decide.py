@@ -16,17 +16,20 @@ import decide as d
 
 @dataclass
 class T:
-    """The duck-typed slice of session.Trial that decide actually reads."""
+    """The duck-typed slice of session.Trial that decide actually reads.
+    Bands read z (load in units of the patient's own resting wobble);
+    load_log stays only for the display multiple."""
 
     result: str
     level: int
-    load_log: float = 0.0
+    z: float = 0.0
     trusted: bool = True
+    load_log: float = 0.0
 
 
-LOW = d.LOW_LOAD - 0.1
+LOW = d.LOW_LOAD - 0.5
 MID = 0.0
-HIGH = d.HIGH_LOAD + 0.1
+HIGH = d.HIGH_LOAD + 0.5
 
 
 def run() -> None:

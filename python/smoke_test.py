@@ -86,7 +86,8 @@ def run() -> None:
         assert rep["final_level"] == start - 1 and rep["end_reason"] == "converged"
         assert rep["reason"] == decide.END_TEXT["converged"]
         assert rep["accuracy"] == 0.8 and rep["disengaged_count"] == 0 and rep["untrusted_rate"] == 0.0
-        assert rep["band"] == [round(math.exp(decide.LOW_LOAD), 2), round(math.exp(decide.HIGH_LOAD), 2)]
+        sd = s.state.baseline_sd
+        assert rep["band"] == [round(math.exp(decide.LOW_LOAD * sd), 2), round(math.exp(decide.HIGH_LOAD * sd), 2)]
         assert {"n", "task_id", "kind", "level", "result", "load", "z", "trusted", "rt",
                 "action", "reason", "reason_text", "quadrant", "bars", "flag"} <= set(rep["tasks"][0])
         assert rep["tasks"][0]["quadrant"] == "effortful" and rep["tasks"][0]["bars"] == 5

@@ -31,7 +31,7 @@ Anything that smells generated is a liability in the room.
 - Everyone's brain signal wobbles a different amount even at rest. A fixed threshold like "1.4x baseline" treats a naturally twitchy signal and a naturally steady one the same, which is unfair in both directions.
 - So during the resting baseline the session now measures two things: the patient's average load (the zero point) and how much it wobbles around that average (`baseline_sd`, their personal yardstick).
 - Every task then gets a z-score: how many of THIS patient's own wobbles above THEIR resting level the effort was. The same shout is loud in a library and inaudible at a concert; z measures against the room the patient's brain actually is.
-- Division of labour: the scaffold computes and carries z (`trial.z`, `baseline_sd` in the report). Lucas chose (2026-08-31) to ship decide.py on FIXED log thresholds for now; z stays plumbed and dormant until flip-cup calibration says which units win.
+- Division of labour: the scaffold computes and carries z (`trial.z`, `baseline_sd` in the report). THIS BRANCH (z-bands, 2026-09-12) flips decide.py onto z at +-1.0 after the venue amp's first recording showed resting wobble (sd 0.60) twice the old fixed band; the display band becomes personal (exp(z*sd), carried on live-load). Merge only if the morning rest-vs-task contrast is muddy; main keeps +-0.30 fixed until then.
 - `BASELINE_SD_FLOOR` in session.py guards the degenerate case: a patient who sat unnaturally still would get a near-zero yardstick and absurd z-scores.
 - The clinician display does not change: humans keep seeing "1.4x baseline"; z is for the algorithm and the report JSON.
 

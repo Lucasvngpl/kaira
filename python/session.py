@@ -361,12 +361,15 @@ class Session:
             provisional = statistics.fmean(v for _, v in self._baseline_samples) if self._baseline_samples else value
             multiple = math.exp(features.relative_load(value, provisional))
         # The 1-5 meter is server-computed from decide's own constants; the
-        # UI renders it and computes nothing.
-        bars = decide.load_bars(math.log(multiple)) if trusted else None
+        # UI renders it and computes nothing. Bands are z units, so divide by
+        # the patient's own wobble (the floor stands in mid-baseline).
+        sd = self.state.baseline_sd or BASELINE_SD_FLOOR
+        bars = decide.load_bars(math.log(multiple) / sd) if trusted else None
         return {
             "load": round(multiple, 2),
             "trusted": trusted,
             "bars": bars,
+            "band": self._display_band(),
             "spectrum": self._spectrum(cleaned),
         }
 
@@ -440,6 +443,12 @@ class Session:
         load_log, load = self._relative(value)
         return load_log, load, trusted
 
+    def _display_band(self) -> list[float]:
+        """The z thresholds as multiples of THIS patient's baseline - what
+        humans read. Personal by construction: exp(z * their wobble)."""
+        sd = self.state.baseline_sd or BASELINE_SD_FLOOR
+        return [round(math.exp(decide.LOW_LOAD * sd), 2), round(math.exp(decide.HIGH_LOAD * sd), 2)]
+
     # --- report -------------------------------------------------------------
 
     def report(self) -> dict:
@@ -461,8 +470,9 @@ class Session:
             "reason": decide.END_TEXT.get(self.end_reason, "Session in progress"),
             "end_reason": self.end_reason,  # converged | ceiling | floor | max_tasks | no_effort | ""
             "converged": self.converged,
-            # Display band derived from decide's thresholds (never stored twice).
-            "band": [round(math.exp(decide.LOW_LOAD), 2), round(math.exp(decide.HIGH_LOAD), 2)],
+            # Display band derived from decide's z thresholds and this
+            # patient's own wobble (never stored twice, personal on purpose).
+            "band": self._display_band(),
             "baseline_sd": round(self.state.baseline_sd, 3),  # the patient's yardstick behind each z
             "baseline_seconds": round(self.baseline_seconds),
             "baseline_stable": self.baseline_stable,  # False = never settled; clinician judgement call

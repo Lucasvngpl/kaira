@@ -17,14 +17,15 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass, field
 
-# Thresholds live in log units; the multiples people see are derived, never
-# stored, so the rule and the display cannot drift apart. Symmetric in log
-# because that is what symmetry means for a ratio. +-0.30 comes from the
-# band-width sweep on the oddball recording (2026-08-31): same right-level
-# accuracy as +-0.405, more convergence, one task faster. Still one person's
-# noise - calibrate_bands() on real sessions is the settled answer.
-LOW_LOAD = -0.30   # below this: not really trying (0.74x baseline)
-HIGH_LOAD = +0.30  # above this: working hard (1.35x baseline)
+# Thresholds live in z units: how many of THIS patient's own resting
+# wobbles the load sits above their rest. The baseline measures the wobble
+# (session.baseline_sd), so the boundary calibrates itself to every patient
+# and cap fit - the venue amp's first recording (2026-09-12) showed resting
+# wobble twice our old fixed band, which is what forced the switch. A task's
+# load averages ~5 windows, so +-1.0 z on it sits near two standard errors:
+# quiet at rest, alive to real effort.
+LOW_LOAD = -1.0   # below this: not really trying
+HIGH_LOAD = +1.0  # above this: working hard
 
 START_LEVEL = 3  # start mid-scale (team call, 2026-09-12): room to move both ways
 MIN_LEVEL = 1
@@ -42,26 +43,26 @@ def calibrate_bands(relative_loads, lo_pct=25, hi_pct=75):
     return pick(lo_pct), pick(hi_pct)
 
 
-def load_band(relative_load: float) -> str:
+def load_band(z: float) -> str:
     """One effort word: low, mid, or high."""
-    if relative_load < LOW_LOAD:
+    if z < LOW_LOAD:
         return "low"
-    if relative_load > HIGH_LOAD:
+    if z > HIGH_LOAD:
         return "high"
     return "mid"
 
 
-def load_bars(relative_load: float) -> int:
+def load_bars(z: float) -> int:
     """The 1-5 meter for the UI. Bar 1 always means low, bar 5 always means
     high (same comparisons as load_band, so they can never disagree); bars
     2-4 just split the middle into thirds."""
     third = (HIGH_LOAD - LOW_LOAD) / 3
     return (
         1
-        + (relative_load >= LOW_LOAD)
-        + (relative_load > LOW_LOAD + third)
-        + (relative_load > LOW_LOAD + 2 * third)
-        + (relative_load > HIGH_LOAD)
+        + (z >= LOW_LOAD)
+        + (z > LOW_LOAD + third)
+        + (z > LOW_LOAD + 2 * third)
+        + (z > HIGH_LOAD)
     )
 
 
@@ -102,14 +103,14 @@ def should_end(history) -> tuple[bool, str | None, int | None]:
             # All three right at the top WITHOUT effort: the test ran out of
             # difficulty, so say "may exceed", not "converged".
             if tail[0].level == MAX_LEVEL and all(
-                t.trusted and load_band(t.load_log) == "low" for t in tail
+                t.trusted and load_band(t.z) == "low" for t in tail
             ):
                 return True, "ceiling", MAX_LEVEL
             return True, "converged", tail[0].level
         # Three misses with no effort behind any of them: the patient was not
         # doing the test, so the data supports no level claim at all. Checked
         # before the floor - "could not perform" would be a lie here.
-        if all(t.result != "correct" and t.trusted and load_band(t.load_log) == "low" for t in tail):
+        if all(t.result != "correct" and t.trusted and load_band(t.z) == "low" for t in tail):
             return True, "no_effort", None
         if tail[0].level == MIN_LEVEL and all(t.result != "correct" for t in tail):
             return True, "floor", MIN_LEVEL
@@ -157,7 +158,7 @@ def decide(trial, history) -> Decision:
     this task. Timeouts count as wrong (no answer is not a right answer)."""
     correct = trial.result == "correct"
     # Can't trust the window? Use the mid column - plain adaptive testing.
-    band = load_band(trial.load_log) if trial.trusted else "mid"
+    band = load_band(trial.z) if trial.trusted else "mid"
     new_level, reason = next_level(correct, trial.level, band)
 
     # Name the cell instead of inventing a blended score with no units.
@@ -169,7 +170,7 @@ def decide(trial, history) -> Decision:
     # One no-effort miss can be a fluke; two in a row is worth telling the clinician.
     prev = history[-1] if history else None
     if reason == "repeat" and prev and prev.result != "correct" and prev.trusted \
-            and load_band(prev.load_log) == "low":
+            and load_band(prev.z) == "low":
         flags.append("disengaged")
 
     effort = f"{band} effort" if trial.trusted else "untrusted signal"
@@ -180,7 +181,7 @@ def decide(trial, history) -> Decision:
         next_level=new_level,
         reason=reason,
         reason_text=text,
-        load_bars=load_bars(trial.load_log) if trial.trusted else None,
+        load_bars=load_bars(trial.z) if trial.trusted else None,
         load_multiple=round(math.exp(trial.load_log), 2) if trial.trusted else None,
         quadrant=quadrant,
         flags=flags,

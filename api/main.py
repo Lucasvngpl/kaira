@@ -222,9 +222,8 @@ def root() -> dict:
         # however it was chosen (live auto-rule or explicit pick).
         "synthetic": not (source["connected"] and (source["stream"] or "").startswith(LIVE_PREFIX)),
         "domains": {d: tasks.has_tasks(d) for d in tasks.domains()},
-        # The UI shades the live sparkline with the effort band; multiples are
-        # DERIVED from decide's log thresholds so display and rule cannot drift.
-        "band": [round(math.exp(decide.LOW_LOAD), 2), round(math.exp(decide.HIGH_LOAD), 2)],
+        # No global band anymore: thresholds are z-scaled per patient, so the
+        # live-load response carries each session's own display band.
     }
 
 
