@@ -66,7 +66,7 @@ from contextlib import asynccontextmanager
 # never blocks. LIVE: only a stream named EE511* (the real amp), retrying
 # until it appears. One state dict, one background thread per attempt.
 
-LIVE_PREFIX = "EE511"
+LIVE_PREFIX = ""
 
 # The patient display proves it is alive by polling; the clinician cannot
 # start a session no patient screen would show. 5 s of silence = gone.
