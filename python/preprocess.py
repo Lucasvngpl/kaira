@@ -130,10 +130,12 @@ def calibrate(baseline_window: np.ndarray, fs: int, ch_names: list[str]) -> None
     """
     global _eog_gain
     if EOG_CHANNEL not in ch_names:
-        raise RuntimeError(
-            f"EOG_CHANNEL '{EOG_CHANNEL}' not found in ch_names - confirm "
-            "the real montage position (unresolved items 3/4) before calibrating"
-        )
+        # Integration fix (2026-09-12): the venue amp is an eego 24 (EE-511)
+        # whose cap may carry no EOG droplead. No EOG means no regression to
+        # calibrate - fall back to threshold-only trust (blinks still trip
+        # the peak-to-peak check) instead of refusing to run.
+        _eog_gain = {}
+        return
     hp = _highpass(baseline_window, fs)
     eog_idx = ch_names.index(EOG_CHANNEL)
     eog = hp[eog_idx, :]

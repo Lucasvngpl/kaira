@@ -39,6 +39,11 @@ from session import Session, SessionStateError  # noqa: E402
 # the board id"). Default ON so the demo never needs an amplifier.
 stream.SYNTHETIC = os.environ.get("KAIRA_SYNTHETIC", "1") != "0"
 
+# Real-mode transport: "lsl" (eego host broadcasts; any OS) or "brainflow"
+# (amp plugged into this machine; Windows only). LSL is the default per the
+# organizers' guidance.
+stream.SOURCE = os.environ.get("KAIRA_SOURCE", stream.SOURCE)
+
 # Rehearsal knob: the protocol baseline is 3 minutes, which is correct for a
 # patient and painful for a dev click-through. KAIRA_BASELINE_SECONDS=15
 # shortens it without code edits; unset means the real protocol.
@@ -173,10 +178,13 @@ if __name__ == "__main__":
         default=stream.SYNTHETIC,
         help="synthetic board (default) vs real eego hardware",
     )
+    parser.add_argument("--source", choices=["lsl", "brainflow"], default=stream.SOURCE,
+                        help="how real EEG arrives when --no-synthetic (default: lsl)")
     parser.add_argument("--host", default="127.0.0.1")
     # 8300, not 8000: Django dev servers (UQwest included) squat on 8000.
     parser.add_argument("--port", type=int, default=8300)
     args = parser.parse_args()
 
     stream.SYNTHETIC = args.synthetic
+    stream.SOURCE = args.source
     uvicorn.run(app, host=args.host, port=args.port)

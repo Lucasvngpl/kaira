@@ -47,6 +47,15 @@ from brainflow.board_shim import BoardIds, BoardShim, BrainFlowInputParams
 # API) is the whole synthetic -> real switch. api/main.py writes it at startup.
 SYNTHETIC: bool = True
 
+# How real data arrives when SYNTHETIC is off. "lsl" receives the stream the
+# eego host software broadcasts (Network operations -> enable LSL) and works
+# on any OS; "brainflow" drives the amp directly and is Windows-only. The
+# organizers' guidance (Discord, 2026-09-12: the venue amp is an eego 24
+# EE-511, "if you're an LSL wizard, you can stream in real time", ANT likely
+# not BrainFlow compatible) makes LSL the primary path. api/main.py sets
+# this from KAIRA_SOURCE / --source.
+SOURCE: str = "lsl"
+
 fs: int = 512  # verified sampling rate of the EE-225; see unresolved item 1 above
 
 # VERIFIED ORDER (2026-09-12): read from the header of the EO-EC .cnt in
@@ -72,6 +81,63 @@ _board: BoardShim | None = None
 _eeg_rows: list[int] | None = None  # row indices of ch_names within BrainFlow's raw data array (real path only)
 
 
+def _connect_lsl() -> None:
+    """Receive the eego host's LSL broadcast: resolve the EEG stream, adopt
+    ITS geometry (fs, channel count, labels - the EE-511 has 24 channels,
+    not our recorded 64, so nothing here may assume a count), and pull
+    samples into a ring buffer on a background thread. get_window() then
+    reads the most recent slice, same contract as every other source."""
+    global fs, ch_names, _lsl_ring, _lsl_write, _lsl_filled
+    from pylsl import StreamInlet, resolve_byprop
+
+    found = resolve_byprop("type", "EEG", timeout=10.0)
+    if not found:
+        raise RuntimeError("no LSL stream of type EEG found - is 'enable LSL' on in the eego software, and are both machines on the same network?")
+    inlet = StreamInlet(found[0], max_buflen=60)
+    info = inlet.info()
+    fs = int(round(info.nominal_srate()))
+    n_ch = info.channel_count()
+    labels = []
+    ch = info.desc().child("channels").child("channel")
+    while not ch.empty():
+        labels.append(ch.child_value("label"))
+        ch = ch.next_sibling("channel")
+    if len(labels) == n_ch:
+        ch_names = labels
+    else:
+        raise RuntimeError(f"LSL stream has {n_ch} channels but {len(labels)} labels - need the pinout metadata to pick channels by name")
+    missing = [c for c in ("F3", "Fz", "F4", "P3", "Pz", "P4") if c not in ch_names]
+    if missing:
+        raise RuntimeError(f"LSL montage is missing {missing} - features.py needs them; check the cap pinout and adjust features.FRONTAL/PARIETAL with the team")
+    print(f"LSL connected: {n_ch} ch @ {fs} Hz, labels {ch_names[:6]}...")
+
+    _lsl_ring = np.zeros((n_ch, fs * 60))  # 60 s of history, plenty for a 2 s window
+    _lsl_write = 0
+    _lsl_filled = 0
+
+    def _pull() -> None:
+        global _lsl_write, _lsl_filled
+        while True:
+            chunk, _ = inlet.pull_chunk(timeout=1.0)
+            if not chunk:
+                continue
+            arr = np.asarray(chunk, dtype=float).T  # (n_ch, n_new)
+            n_new = arr.shape[1]
+            cap = _lsl_ring.shape[1]
+            for k in range(n_new):  # ring write; chunks are small (<= a few hundred samples)
+                _lsl_ring[:, (_lsl_write + k) % cap] = arr[:, k]
+            _lsl_write = (_lsl_write + n_new) % cap
+            _lsl_filled = min(cap, _lsl_filled + n_new)
+
+    import threading
+    threading.Thread(target=_pull, daemon=True).start()
+
+
+_lsl_ring = None
+_lsl_write = 0
+_lsl_filled = 0
+
+
 def connect() -> None:
     """Open the board (synthetic or real per SYNTHETIC) and start streaming.
 
@@ -92,6 +158,9 @@ def connect() -> None:
     global _board, _eeg_rows, fs
     if SYNTHETIC:
         return  # nothing to open; get_window() generates data directly
+    if SOURCE == "lsl":
+        _connect_lsl()
+        return
     # Integration fix (2026-09-12): the board id must be chosen HERE, not at
     # import - api/main.py flips SYNTHETIC after importing this module, so a
     # module-level constant would freeze the wrong board on the real path.
@@ -166,6 +235,11 @@ def get_window(seconds: float) -> np.ndarray:
     makes amplitudes meaningful.
     """
     n_samples = int(round(seconds * fs))
+    if not SYNTHETIC and SOURCE == "lsl" and _lsl_ring is not None:
+        cap = _lsl_ring.shape[1]
+        n = min(n_samples, _lsl_filled)
+        idx = (np.arange(_lsl_write - n, _lsl_write) % cap)
+        return _lsl_ring[:, idx]
     if SYNTHETIC or _board is None:
         return 4800.0 + _rng.normal(0.0, 10.0, size=(len(ch_names), n_samples))
     raw = _board.get_current_board_data(n_samples)
