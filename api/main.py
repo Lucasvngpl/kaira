@@ -28,6 +28,7 @@ from pydantic import BaseModel, Field
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "python"))
 
 import math
+import threading
 
 import decide  # noqa: E402
 import session as session_mod  # noqa: E402
@@ -53,12 +54,82 @@ session_mod.BASELINE_SECONDS = float(
 
 from contextlib import asynccontextmanager
 
+# --- Signal-source manager --------------------------------------------------
+# The UI flips between TEST (dummy LSL stream if one is broadcasting, else
+# the synthetic generator - never blocks) and LIVE (only a stream named
+# EE511*, the real amplifier's broadcast; retries until it appears). All the
+# state one dict, all the work one background thread per request.
+
+LIVE_PREFIX = "EE511"
+
+source = {
+    "mode": "test",  # test | live
+    "connected": False,
+    "stream": None,  # LSL stream name when connected over LSL
+    "fs": None,
+    "channels": None,
+    "detail": "",
+    "attempting": False,
+}
+_attempt_lock = threading.Lock()
+
+
+def _attempt(mode: str) -> None:
+    """One connection attempt; called on a worker thread. LIVE retries
+    every few seconds for as long as live stays selected and unconnected -
+    the UI's 'polling until it works'."""
+    with _attempt_lock:
+        if source["mode"] != mode:
+            return  # the user switched modes while this attempt waited its turn
+        source["attempting"] = True
+        try:
+            if mode == "test":
+                stream.SOURCE = "lsl"
+                stream.SYNTHETIC = False
+                try:
+                    stream.connect()  # any stream: a dummy makes a transport rehearsal
+                    source.update(connected=True, stream=stream.lsl_name,
+                                  detail=f"dummy LSL stream: {stream.lsl_name}")
+                except Exception:
+                    stream.SYNTHETIC = True  # no dummy around: built-in generator
+                    source.update(connected=True, stream=None, detail="synthetic generator")
+                source.update(fs=stream.fs, channels=len(stream.ch_names))
+            else:
+                stream.SYNTHETIC = False
+                stream.SOURCE = "lsl"
+                stream.connect(name_prefix=LIVE_PREFIX)
+                source.update(connected=True, stream=stream.lsl_name,
+                              fs=stream.fs, channels=len(stream.ch_names), detail="")
+        except Exception as exc:
+            source.update(connected=False, stream=None, detail=str(exc))
+        finally:
+            source["attempting"] = False
+        if source["mode"] != mode:
+            # Mode flipped while we were connecting: our result describes the
+            # wrong mode, so mark it stale rather than lie.
+            source.update(connected=False, detail="connecting...")
+    if mode == "live" and not source["connected"] and source["mode"] == "live":
+        # Keep looking: the amp usually appears seconds after someone fixes
+        # the checklist item the detail names.
+        threading.Timer(5.0, _attempt, args=("live",)).start()
+
+
+def set_mode(mode: str) -> None:
+    source["mode"] = mode
+    source["connected"] = False
+    source["detail"] = "connecting..."
+    threading.Thread(target=_attempt, args=(mode,), daemon=True).start()
+
 
 @asynccontextmanager
 async def _lifespan(app: FastAPI):
-    # Real amplifier only: opens the BrainFlow session (no-op when synthetic).
-    # Runs after the env/CLI have settled SYNTHETIC, which import time cannot.
-    stream.connect()
+    if stream.SOURCE == "brainflow" and not stream.SYNTHETIC:
+        # Fallback path: the amp is plugged into THIS machine (Windows).
+        stream.connect()
+    else:
+        # LSL/synthetic: never block startup; apply the default mode and let
+        # the manager connect in the background.
+        set_mode("live" if not stream.SYNTHETIC else "test")
     yield
     stream.release()
 
@@ -111,7 +182,8 @@ def _get(session_id: str) -> Session:
 def root() -> dict:
     return {
         "app": "kaira",
-        "synthetic": stream.SYNTHETIC,
+        # "Demo signal" shows unless the REAL amp is verified connected.
+        "synthetic": not (source["mode"] == "live" and source["connected"]),
         "domains": {d: tasks.has_tasks(d) for d in tasks.domains()},
         # The UI shades the live sparkline with the effort band; multiples are
         # DERIVED from decide's log thresholds so display and rule cannot drift.
@@ -119,8 +191,34 @@ def root() -> dict:
     }
 
 
+@app.get("/stream/status")
+def stream_status() -> dict:
+    return source
+
+
+class ModeRequest(BaseModel):
+    mode: Literal["test", "live"]
+
+
+@app.post("/stream/mode")
+def stream_mode(req: ModeRequest) -> dict:
+    set_mode(req.mode)
+    return source
+
+
+@app.get("/session/current")
+def session_current() -> dict:
+    # The patient display auto-attaches to the newest session still running.
+    for s in reversed(list(sessions.values())):
+        if not s.ended:
+            return {"session_id": s.id}
+    return {"session_id": None}
+
+
 @app.post("/session/start")
 def start(req: StartRequest) -> dict:
+    if source["mode"] == "live" and not source["connected"]:
+        raise SessionStateError("live mode is selected but the amplifier is not connected yet")
     s = session_mod.begin(req.patient_ref, req.domain)
     sessions[s.id] = s
     return {"session_id": s.id, "baseline_seconds": session_mod.BASELINE_SECONDS}
@@ -134,8 +232,8 @@ def baseline_status(session_id: str) -> dict:
 @app.post("/session/{session_id}/baseline-skip")
 def baseline_skip(session_id: str) -> dict:
     # Demo-only: a real patient's baseline is protocol, not a waiting screen.
-    if not stream.SYNTHETIC:
-        raise HTTPException(status_code=400, detail="baseline skip is only available on the synthetic board")
+    if source["mode"] == "live":
+        raise HTTPException(status_code=400, detail="baseline skip is only available in test mode")
     return _get(session_id).skip_baseline()
 
 

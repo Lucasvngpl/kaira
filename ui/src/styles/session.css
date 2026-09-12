@@ -575,3 +575,120 @@
 .pt-foot .kr-wordmark {
   height: 13px;
 }
+
+
+/* ---- Role choice: the first screen on any device ------------------------------ */
+
+.sn-role {
+  min-height: 70dvh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 28px;
+}
+
+.sn-role__title {
+  font-size: 1.6rem;
+  font-weight: 600;
+  margin: 0;
+}
+
+.sn-role__choices {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.sn-role__choice {
+  width: 240px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 20px 22px;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-md);
+  background: #fff;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.12s, transform 0.14s var(--ease-out);
+}
+
+.sn-role__choice:hover {
+  border-color: var(--ink);
+}
+
+.sn-role__choice:active {
+  transform: scale(0.98);
+}
+
+.sn-role__choice svg {
+  width: 20px;
+  height: 20px;
+}
+
+.sn-role__choice span {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.sn-role__choice small {
+  font-size: 12.5px;
+  color: var(--text-secondary);
+  line-height: 1.45;
+}
+
+/* ---- Signal-source toggle + live checklist ------------------------------------ */
+
+.sn-seg {
+  display: inline-flex;
+  border: 0.5px solid var(--ink);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.sn-seg__opt {
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  padding: 7px 16px;
+  border: none;
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.sn-seg__opt--on {
+  background: var(--ink);
+  color: #fff;
+}
+
+/* The looking-for-the-amp panel: calm instructions, not an error screen. */
+.sn-lsl {
+  margin-top: 10px;
+  padding: 12px 14px;
+  border: 1px solid var(--border-soft);
+  border-left: 3px solid var(--status-warn);
+  border-radius: var(--radius-field);
+  font-size: 13px;
+}
+
+.sn-lsl__head {
+  margin: 0 0 6px;
+  font-weight: 600;
+}
+
+.sn-lsl__detail {
+  margin: 0 0 8px;
+  color: var(--status-warn);
+}
+
+.sn-lsl__list {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--text-secondary);
+  line-height: 1.7;
+}

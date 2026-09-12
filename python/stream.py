@@ -81,24 +81,35 @@ _board: BoardShim | None = None
 _eeg_rows: list[int] | None = None  # row indices of ch_names within BrainFlow's raw data array (real path only)
 
 
-def _connect_lsl() -> None:
+def _connect_lsl(name_prefix: str | None = None) -> None:
     """Receive the eego host's LSL broadcast: resolve the EEG stream, adopt
     ITS geometry (fs, channel count, labels - the EE-511 has 24 channels,
     not our recorded 64, so nothing here may assume a count), and pull
     samples into a ring buffer on a background thread. get_window() then
-    reads the most recent slice, same contract as every other source."""
-    global fs, ch_names, _lsl_ring, _lsl_write, _lsl_filled
+    reads the most recent slice, same contract as every other source.
+
+    name_prefix narrows to streams whose name starts with it - the UI's
+    LIVE mode passes "EE511" so a dummy rehearsal stream can never pass
+    as the real amplifier."""
+    global fs, ch_names, _lsl_ring, _lsl_write, _lsl_filled, _lsl_generation, lsl_name
     from pylsl import StreamInlet, resolve_byprop, resolve_streams
 
     # The eego host SHOULD declare type EEG; if it labels itself differently
     # (LabRecorder showed the stream named "EE511-..."), fall back to any
     # multi-channel stream rather than failing on a metadata nicety.
-    found = resolve_byprop("type", "EEG", timeout=10.0)
+    found = resolve_byprop("type", "EEG", timeout=5.0)
     if not found:
-        found = [s for s in resolve_streams(wait_time=5.0) if s.channel_count() >= 8]
+        found = [s for s in resolve_streams(wait_time=3.0) if s.channel_count() >= 8]
+    if name_prefix:
+        names = [s.name() for s in found]
+        found = [s for s in found if s.name().startswith(name_prefix)]
+        if not found:
+            seen = f"saw {names}" if names else "saw no streams at all"
+            raise RuntimeError(f"no LSL stream named {name_prefix}* - {seen}. Is the eego software streaming with LSL enabled, on this network?")
     if not found:
         raise RuntimeError("no LSL stream found - is 'enable LSL' on in the eego software, and are both machines on the same network?")
     inlet = StreamInlet(found[0], max_buflen=60)
+    lsl_name = found[0].name()
     info = inlet.info()
     fs = int(round(info.nominal_srate()))
     n_ch = info.channel_count()
@@ -119,10 +130,12 @@ def _connect_lsl() -> None:
     _lsl_ring = np.zeros((n_ch, fs * 60))  # 60 s of history, plenty for a 2 s window
     _lsl_write = 0
     _lsl_filled = 0
+    _lsl_generation += 1  # a reconnect makes every older pull thread retire itself
+    my_generation = _lsl_generation
 
     def _pull() -> None:
         global _lsl_write, _lsl_filled
-        while True:
+        while my_generation == _lsl_generation:
             chunk, _ = inlet.pull_chunk(timeout=1.0)
             if not chunk:
                 continue
@@ -141,9 +154,11 @@ def _connect_lsl() -> None:
 _lsl_ring = None
 _lsl_write = 0
 _lsl_filled = 0
+_lsl_generation = 0
+lsl_name: str | None = None  # name of the connected LSL stream, for display
 
 
-def connect() -> None:
+def connect(name_prefix: str | None = None) -> None:
     """Open the board (synthetic or real per SYNTHETIC) and start streaming.
 
     Real path only - the synthetic path never touches BrainFlow's board
@@ -164,7 +179,7 @@ def connect() -> None:
     if SYNTHETIC:
         return  # nothing to open; get_window() generates data directly
     if SOURCE == "lsl":
-        _connect_lsl()
+        _connect_lsl(name_prefix)
         return
     # Integration fix (2026-09-12): the board id must be chosen HERE, not at
     # import - api/main.py flips SYNTHETIC after importing this module, so a
