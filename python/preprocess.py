@@ -173,7 +173,14 @@ def _average_reference(window: np.ndarray, ch_names: list[str]) -> np.ndarray:
 def _is_trusted(window: np.ndarray, ch_names: list[str]) -> bool:
     if _eog_gain is None:
         return False  # pre-calibration windows are uncorrected for blinks - don't let decide.py trust them
-    rows = _reference_rows(ch_names)
+    # Trust is judged on the channels the load index actually reads. The
+    # first venue-amp recording (2026-09-12) had a bad-contact C3 sitting at
+    # ~350 uVpp while every formula channel was clean at 50-70; a flaky
+    # electrode the decision never reads must not veto the whole session.
+    # Blinks still trip this: they hit the frontal trio hard.
+    import features
+    used = set(features.FRONTAL + features.PARIETAL)
+    rows = [i for i, n in enumerate(ch_names) if n in used] or _reference_rows(ch_names)
     ptp = np.ptp(window[rows, :], axis=1)
     return bool(np.all(ptp < TRUST_PEAK_TO_PEAK_UV))
 
