@@ -307,14 +307,24 @@ class Session:
         }
 
     def _pick_task(self) -> tasks.Task:
-        """Prefer an unseen task at the current level; reuse least-recently-used when exhausted."""
+        """Prefer an unseen task at the current level; reuse least-recently-used
+        when exhausted. Never the same OBJECT twice in a row: the trailing item
+        number names the same stimulus across levels (vis_l2_001 and vis_l3_001
+        are both the chair), and a level change must not look like a rerun."""
         pool = tasks.get_tasks(self.state.domain, self.state.level)
         if not pool:
             raise SessionStateError(f"no tasks at level {self.state.level} for {self.state.domain}")
-        for t in pool:
-            if t.id not in self._used_ids:
-                return t
-        return min(pool, key=lambda t: self._used_ids.index(t.id))
+        last = self.state.history[-1].task_id if self.state.history else None
+
+        def other_object(t: tasks.Task) -> bool:
+            return last is None or t.id.split("_")[-1] != last.split("_")[-1]
+
+        unseen = [t for t in pool if t.id not in self._used_ids]
+        candidates = [t for t in unseen if other_object(t)] or unseen
+        if candidates:
+            return candidates[0]
+        reused = sorted(pool, key=lambda t: self._used_ids.index(t.id))
+        return next((t for t in reused if other_object(t)), reused[0])
 
     def patient_view(self) -> dict:
         """What the patient's display may know: the phase, and the current
