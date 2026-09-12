@@ -1,38 +1,14 @@
-"""EEG acquisition via BrainFlow.
+"""EEG acquisition: synthetic noise, LSL receive, or BrainFlow direct.
 
-Owner: Aarnav.
+Owner: Aarnav (LSL plumbing wired by the scaffold, 2026-09-12).
 
-Verified hardware facts (HANDOFF.md section 3 - do not re-derive these):
-  - Amplifier: ANT Neuro eego mylab 64, product code EE-225.
-  - BrainFlow board id 36 = BoardIds.ANT_NEURO_EE_225_BOARD.
-  - BrainFlow's ANT Neuro boards run on WINDOWS ONLY.
-  - Cap: waveguard original CA-208, 64 channels, 10/10 layout.
-  - Reference CPz (hardware, never a data channel), ground AFz, EOG on ch 32.
-  - Sampling rate 512 Hz, 24-bit, one A/D converter per channel.
-  - BrainFlow's SYNTHETIC_BOARD emits plausible fake data through the
-    identical API, so everything downstream develops with no hardware.
+The venue path is LSL: the eego host software broadcasts, we receive on
+any OS. BrainFlow direct-to-amp stays as a Windows-only fallback. The
+synthetic generator keeps everything runnable with no hardware at all.
 
-*** UNRESOLVED - CONFIRM BEFORE SHIPPING (see chat writeup for full list) ***
-  1. BrainFlow's static descriptor for BoardIds.ANT_NEURO_EE_225_BOARD reports
-     a default sampling_rate of 16000 Hz, not 512 Hz. 512 Hz is presumably
-     reachable via config_board(), but the exact config string and whether
-     get_sampling_rate() reflects it afterward is UNVERIFIED - never tested
-     against real hardware. connect() below asserts fs == 512 after
-     configuring and raises loudly if that assertion fails; don't remove that
-     guard until this is confirmed on the real amp.
-  2. BoardShim.get_eeg_names(ANT_NEURO_EE_225_BOARD) raises
-     UNSUPPORTED_BOARD_ERROR - BrainFlow's board description has no channel
-     names for this board at all. Real channel order MUST come from the
-     CA-208 wiring/montage sheet, not from BrainFlow. REAL_CH_NAMES below is
-     still the old placeholder order - swap it for the verified order before
-     trusting any by-name channel logic downstream (this file's pick(),
-     preprocess.py's EOG_CHANNEL constant, features.py's frontal/parietal
-     picks).
-
-Interface (fixed - session.py, features.py and the API are built against it;
-changing it needs both branches, see HANDOFF section 8):
-    get_window(seconds: float) -> np.ndarray   # (n_channels, n_samples), microvolts
-    pick(data: np.ndarray, names: list[str]) -> np.ndarray
+Interface (fixed - session.py, features.py and the API build against it):
+    get_window(seconds) -> np.ndarray   # (n_channels, n_samples), microvolts
+    connect() / release()
     ch_names: list[str]
     fs: int
 """
@@ -56,14 +32,11 @@ SYNTHETIC: bool = True
 # this from KAIRA_SOURCE / --source.
 SOURCE: str = "lsl"
 
-fs: int = 512  # verified sampling rate of the EE-225; see unresolved item 1 above
+fs: int = 512  # confirmed by the rig's own .cnt recordings; LSL overrides from stream metadata
 
-# VERIFIED ORDER (2026-09-12): read from the header of the EO-EC .cnt in
-# ~/NOVA_ANT via mne.io.read_raw_ant - a recording made on this exact amp
-# and cap, so this is the montage as the rig itself writes it. sfreq in the
-# same header is 512.0, and "EOG" sits at position 32 (index 31), matching
-# HANDOFF. Residual risk: BrainFlow's row order could differ from the .cnt
-# driver's - proven on the day by the eyes-closed alpha check (O1/O2/POz).
+# The 64-channel order as the rig itself writes it (read from the EO-EC
+# .cnt header, 2026-09-12). LSL replaces this with the live stream's own
+# labels at connect - the EE-511 sends 24.
 ch_names: list[str] = [
     "Fp1", "Fpz", "Fp2", "F7", "F3", "Fz", "F4", "F8",
     "FC5", "FC1", "FC2", "FC6", "M1", "T7", "C3", "Cz",
@@ -162,22 +135,9 @@ lsl_name: str | None = None  # name of the connected LSL stream, for display
 
 
 def connect(name_prefix: str | None = None) -> None:
-    """Open the board (synthetic or real per SYNTHETIC) and start streaming.
-
-    Real path only - the synthetic path never touches BrainFlow's board
-    object at all (see get_window). Deliberate simplification: BrainFlow's
-    own SYNTHETIC_BOARD exposes just 16 generic channels
-    (['Fz','C3','Cz','C4','Pz','PO7','Oz','PO8','F5','F7','F3','F1','F2','F4',
-    'F6','F8'] at 250 Hz) which doesn't line up with our 64-channel/512 Hz
-    montage, so routing fake data through it would mean either faking a
-    64-channel remap on top of BrainFlow's own fake data (extra complexity
-    for no real benefit) or shrinking every downstream by-name channel pick
-    to whatever's in that list of 16. Keeping get_window's existing
-    self-contained numpy generator for SYNTHETIC=True avoids both problems.
-    CONFIRM with the team if a more realistic synthetic source (e.g.
-    BrainFlow's PLAYBACK_FILE_BOARD replaying converted .cnt data) is wanted
-    for a later pass - not implemented here, see chat writeup.
-    """
+    """Open the signal source per SYNTHETIC/SOURCE. Synthetic needs nothing:
+    get_window() generates directly (BrainFlow's own synthetic board has the
+    wrong geometry, 16 ch @ 250 Hz, so we do not route through it)."""
     global _board, _eeg_rows, fs
     if SYNTHETIC:
         return  # nothing to open; get_window() generates data directly
@@ -236,27 +196,11 @@ def release() -> None:
 
 
 def get_window(seconds: float) -> np.ndarray:
-    """Return the most recent `seconds` of EEG as (n_channels, n_samples) in microvolts.
+    """The most recent `seconds` of EEG, (n_channels, n_samples), microvolts.
 
-    Real path: pulls from BrainFlow's own ring buffer via
-    get_current_board_data, which always returns the latest N samples (zero
-    rows are NOT inserted by BrainFlow if fewer than N samples exist yet -
-    the array is simply shorter until the buffer fills; callers this early in
-    a session should be prepared for a shorter-than-requested window).
-    BrainFlow's default internal buffer capacity is 450,000 samples/channel,
-    far more than the 1024 samples (2 s @ 512 Hz) the API needs at its 4 Hz
-    poll rate, so no explicit buffer-size override is needed to avoid
-    overflow between polls.
-
-    Synthetic path: self-contained white noise around the eego's DC offset
-    (+4800 uV) - flat band power, so downstream load index hovers near
-    baseline and jitters. Fake data, real analysis. Does not go through
-    BrainFlow at all (see connect() docstring for why).
-
-    Per HANDOFF: the eego is DC-COUPLED, raw values sit around +4800 uV, not
-    zero. Do NOT zero-center here; preprocess.py owns the 1 Hz high-pass that
-    makes amplitudes meaningful.
-    """
+    Early in a session the buffer may hold less than requested; callers get
+    a shorter window. Values are NOT zero-centred (the eego is DC-coupled,
+    ~+4800 uV offset); preprocess owns the high-pass."""
     n_samples = int(round(seconds * fs))
     if not SYNTHETIC and SOURCE == "lsl" and _lsl_ring is not None:
         cap = _lsl_ring.shape[1]

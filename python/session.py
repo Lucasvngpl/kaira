@@ -37,13 +37,11 @@ import tasks
 
 # --- Tunables (session-level policy, not signal processing) -----------------
 
-# Resting baseline, team protocol (2026-09-02): record at least 90 s, then
-# stop as soon as the signal has settled - the last two 30 s means within
-# 10% of each other - capped at 3 minutes. A baseline that never settles
-# falls back to the plain 3-minute average, flagged so the clinician can
-# check electrodes and decide whether to redo it. For rehearsal the API
-# honours KAIRA_BASELINE_SECONDS; an override at or below the minimum skips
-# the settling logic (plain average over that time, no flag).
+# Resting baseline (team protocol 2026-09-02): at least 90 s, stop early
+# once the last two 30 s means agree within 10%, cap at 3 minutes. Never
+# settles -> plain 3-minute average plus a flag for the clinician.
+# KAIRA_BASELINE_SECONDS shortens for rehearsal; overrides at or below the
+# minimum skip the settling logic.
 BASELINE_SECONDS = 180.0  # the cap
 BASELINE_MIN_SECONDS = 90.0
 BASELINE_CHECK_SECONDS = 30.0
@@ -54,18 +52,13 @@ BASELINE_TOLERANCE = math.log(1.10)
 # samples at 512 Hz for stable low-frequency bands.
 SAMPLE_SECONDS = 2.0
 
-# Aarnav's preprocess refuses to trust ANY window until its blink-removal
-# has been calibrated once, and assigns that call to session.py. We do it
-# early in the resting baseline: by then the patient has sat still and
-# blinked naturally for long enough to estimate the EOG coefficients, and
-# every later baseline sample benefits. Short rehearsal baselines calibrate
-# proportionally earlier on whatever has streamed by then.
+# preprocess trusts nothing until calibrated; session owns that call. It
+# happens early in the baseline, once enough resting signal exists to fit
+# ASR. Short rehearsal baselines calibrate proportionally earlier.
 CALIBRATE_AFTER_SECONDS = 20.0
 
-# The live spectrum shown to judges: display plumbing only, the decision
-# never reads it. 2-20 Hz because theta (4-8) and alpha (8-12) are the whole
-# story; below 2 Hz residual drift and 1/f power dominate the y-scale and
-# squash the bands of interest.
+# Live spectrum for the run screen: display only, the decision never reads
+# it. 2-20 Hz - below 2, drift and 1/f power squash the bands that matter.
 SPECTRUM_MIN_HZ = 2.0
 SPECTRUM_MAX_HZ = 20.0
 
@@ -80,10 +73,8 @@ assert (decide.MIN_LEVEL, decide.MAX_LEVEL) == (tasks.LEVEL_MIN, tasks.LEVEL_MAX
 assert set(features.FRONTAL + features.PARIETAL) <= set(stream.ch_names), \
     "stream.ch_names is missing channels features.py needs (names are case-sensitive)"
 
-# Floor for the baseline's standard deviation (log units). z divides by the
-# SD, and a patient who sat unusually still would otherwise get a tiny SD
-# and absurdly inflated z-scores; the floor caps how much stillness can
-# amplify. Team-tunable once real recordings show typical resting spread.
+# z divides by the baseline SD; a patient who sat unusually still would get
+# a tiny SD and absurd z-scores. The floor caps that amplification.
 BASELINE_SD_FLOOR = 0.05
 
 # The movement word for the report's action column. decide's six reasons
@@ -271,10 +262,9 @@ class Session:
         return self.baseline_status()
 
     def adopt_baseline(self, other: "Session") -> dict:
-        """Reuse a baseline already recorded in this process (same patient,
-        cap untouched): the zero point, the wobble, and the stability verdict
-        carry over, so a re-run session starts at the first task immediately.
-        preprocess's blink calibration is module-level and already done."""
+        """Reuse an earlier session's baseline (same patient, cap untouched):
+        zero point, wobble and stability carry over; re-runs start at task
+        one. preprocess's calibration is module-level and already done."""
         self.state.baseline = other.state.baseline
         self.state.baseline_sd = other.state.baseline_sd
         self.baseline_seconds = other.baseline_seconds
@@ -360,12 +350,9 @@ class Session:
         return next((t for t in reused if other_object(t)), reused[0])
 
     def patient_view(self) -> dict:
-        """What the patient's display may know: the phase, and the current
-        stimulus when there is one. Never answers, never measurements -
-        this dict is the entire information budget of the patient screen.
-        Read-only on purpose: polling it takes no samples and advances
-        nothing, so a second (or crashed) patient tab cannot corrupt a
-        session."""
+        """Everything the patient display may know: phase plus the current
+        stimulus. No answers, no measurements. Read-only, takes no samples,
+        so extra or crashed patient tabs cannot corrupt a session."""
         if self.ended:
             return {"phase": "ended"}
         if not self._baseline_done:

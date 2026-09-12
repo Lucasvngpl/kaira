@@ -1,35 +1,22 @@
 """Filtering and artifact cleaning.
 
-Owner: Aarnav. ASR integration wired by the scaffold (2026-09-12, team
-decision) - the algorithm itself is meegkit's implementation of Artifact
-Subspace Reconstruction (asrpy was tried first and is broken on numpy 2).
+Owner: Aarnav. ASR wired by the scaffold (2026-09-12, team decision),
+using meegkit's implementation (asrpy is broken on numpy 2).
 
-This module turns a raw window from stream.get_window() into something
-features.py is allowed to trust. session.py calls clean() between
-get_window() and cognitive_load(); calibrate() runs once per session, on
-~20 s of the resting baseline, and everything here keys off that.
+calibrate() runs once per session on ~20 s of resting baseline; clean()
+then processes every window:
+  1. 1 Hz high-pass (the eego is DC-coupled, ~+4800 uV offset).
+  2. ASR repair: calibration learned this patient's clean-signal envelope;
+     any component that blows past it (blink, clench, cable tug) is rebuilt
+     from the components that stayed clean. The cap has no EOG channel, so
+     repair replaces blink regression.
+  3. Average reference (M1/M2 masked, never deleted - row order always
+     matches the caller's ch_names).
+  4. Trust gate on the six formula channels. Loose post-ASR (rely on the
+     repair), strict when ASR could not fit (short rehearsal baselines).
 
-The pipeline, in order, and why:
-  1. 1 Hz HIGH-PASS. The eego is DC-coupled; raw values sit around +4800 uV.
-     Nothing downstream means anything before the drift is gone. Zero-phase
-     per pulled window - fine for band power, which never reads phase.
-  2. ASR REPAIR. Calibration learned what this patient's clean signal looks
-     like (the principal components of ~20 s of rest and their normal
-     range). Any signal component that blows past that envelope - a blink,
-     a jaw clench, a cable tug - gets reconstructed from the components
-     that stayed clean. Repair beats discard here because the venue cap
-     (EE-511 / NA-246) has no EOG channel to regress blinks with.
-  3. AVERAGE REFERENCE across the surviving channels (M1/M2 masked out, not
-     deleted - row order always matches the ch_names the caller passed).
-  4. TRUST GATE, judged on the six channels the load formula reads. With
-     ASR active the threshold is deliberately HIGH (team call): ASR already
-     repaired what is repairable, so only a window it visibly could not
-     save gets discarded. Without ASR (short rehearsal baselines) the
-     stricter raw threshold applies.
-
-Validation gate (HANDOFF section 4): the EO-EC recording must keep its
-order-of-magnitude eyes-closed occipital alpha ratio AFTER this pipeline -
-proof that ASR removes artifacts without eating real brain rhythm.
+Gate for changes here: tools/validate_eoec.py must keep the eyes-closed
+occipital alpha ratio (~50x) - proof we clean artifacts, not brain signal.
 """
 
 from __future__ import annotations

@@ -1,10 +1,7 @@
-// The live Welch spectrum: the load formula, drawn. Two curves straight from
-// the server's PSD (same Welch settings as features.py): the frontal channel
-// group with its theta band shaded blue, the parietal group with its alpha
-// band shaded green - cognitive load is ln(blue area / green area). Hand-
-// rolled SVG (house rule: recharts is for report charts, everything live is
-// hand-drawn). No y-axis on purpose: the shape and the ratio are the story,
-// absolute power is not.
+// The load formula, drawn live: frontal curve with theta shaded blue,
+// parietal with alpha shaded green - load is ln(blue area / green area).
+// Curves come from the server's PSD (same Welch settings as features.py).
+// Hand-rolled SVG per house rule; no y-axis because the ratio is the story.
 import '../styles/session.css';
 
 const THETA = [4, 8];

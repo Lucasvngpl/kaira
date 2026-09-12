@@ -1,7 +1,5 @@
-// New-assessment form: patient reference + domain, then hand off to baseline.
-// Also home of the signal-source switch: Test (dummy stream or generator)
-// vs Live (only the real EE511 amplifier counts, verified before anything
-// can start).
+// New-assessment form, plus the signal-source switch (Test vs Live, where
+// only the real EE511 amp counts) and the patient-screen QR.
 import { useEffect, useState } from 'react';
 import { FiArrowUpRight } from 'react-icons/fi';
 import QRCode from 'qrcode';

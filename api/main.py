@@ -61,11 +61,10 @@ session_mod.BASELINE_SECONDS = float(
 
 from contextlib import asynccontextmanager
 
-# --- Signal-source manager --------------------------------------------------
-# The UI flips between TEST (dummy LSL stream if one is broadcasting, else
-# the synthetic generator - never blocks) and LIVE (only a stream named
-# EE511*, the real amplifier's broadcast; retries until it appears). All the
-# state one dict, all the work one background thread per request.
+# --- Signal-source manager ---------------------------------------------------
+# TEST: dummy LSL stream if broadcasting, else the synthetic generator;
+# never blocks. LIVE: only a stream named EE511* (the real amp), retrying
+# until it appears. One state dict, one background thread per attempt.
 
 LIVE_PREFIX = "EE511"
 
@@ -106,9 +105,8 @@ _attempt_lock = threading.Lock()
 
 
 def _attempt(mode: str) -> None:
-    """One connection attempt; called on a worker thread. LIVE retries
-    every few seconds for as long as live stays selected and unconnected -
-    the UI's 'polling until it works'."""
+    """One connection attempt on a worker thread; LIVE retries every few
+    seconds while it stays selected and unconnected."""
     with _attempt_lock:
         if source["mode"] != mode:
             return  # the user switched modes while this attempt waited its turn
@@ -326,10 +324,9 @@ def task_start(session_id: str, req: TaskStartRequest) -> dict:
 
 @app.post("/session/{session_id}/baseline-file")
 async def baseline_file(session_id: str, file: UploadFile) -> dict:
-    """Adopt a baseline from an uploaded resting recording: the .cnt the
-    eego software writes, or an .npz from tools/record.py. The file is
-    pushed through the real pipeline (clean, trust, load per 2 s window)
-    and its mean/wobble become this session's baseline."""
+    """Adopt a baseline from an uploaded resting recording (.cnt from the
+    eego software, .npz from tools/record.py): run it through the real
+    pipeline and take its mean/wobble as this session's baseline."""
     me = _get(session_id)
     raw = await file.read()
     suffix = Path(file.filename or "").suffix.lower()

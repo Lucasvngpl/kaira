@@ -17,13 +17,11 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass, field
 
-# Thresholds live in z units: how many of THIS patient's own resting
-# wobbles the load sits above their rest. The baseline measures the wobble
-# (session.baseline_sd), so the boundary calibrates itself to every patient
-# and cap fit - the venue amp's first recording (2026-09-12) showed resting
-# wobble twice our old fixed band, which is what forced the switch. A task's
-# load averages ~5 windows, so +-1.0 z on it sits near two standard errors:
-# quiet at rest, alive to real effort.
+# Thresholds are z units: how many of THIS patient's own resting wobbles
+# the load sits above their rest. The baseline measures the wobble, so the
+# boundary calibrates itself per patient and cap fit (fixed +-0.30 bands
+# misread 38% of resting tasks on the venue amp, 2026-09-12). A task load
+# averages ~5 windows, so +-1.0 z sits near two standard errors of it.
 LOW_LOAD = -1.0   # below this: not really trying
 HIGH_LOAD = +1.0  # above this: working hard
 

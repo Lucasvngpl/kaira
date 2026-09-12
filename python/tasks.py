@@ -1,22 +1,16 @@
 """The task bank: domain -> difficulty level (1-5) -> tasks.
 
-Each task is what the CLINICIAN needs on screen: the script they read aloud
-and the scoring criterion they check the answer against. The stimulus itself
-appears on the PATIENT display (the `image` field).
+Each task holds what the CLINICIAN reads and checks; the stimulus itself
+shows on the patient display (the `image` field).
 
-The Visuospatial set is Alice's (2026-09-11): ten everyday objects, each
-drawn at five levels of degradation. Level 1 is the complete drawing; by
-level 5 only fragments remain. The patient names the object, so recognising
-it from less and less visual information is what makes higher levels harder.
-The PNGs in ui/public/tasks were spliced from her grid image; when she sends
-an updated set, re-splice and nothing else changes.
+Visuospatial is Alice's set (2026-09-11): ten everyday objects, each drawn
+at five degradation levels - level 1 complete, level 5 fragments. The
+patient names the object; recognising it from less is what makes higher
+levels harder. PNGs live in ui/public/tasks, spliced from her grid; a new
+grid means re-splicing and nothing else.
 
-One known property of this design: a patient who climbs levels meets the
-same object again, more degraded, having already named it. The team accepts
-this for the buildathon; a bigger object pool fixes it later.
-
-Attention and Language exist as empty structures so the extension path is
-obvious, but only Visuospatial is populated.
+Known trade-off: a patient who climbs meets an object again, more degraded,
+having already named it. Accepted for a 10-object buildathon set.
 """
 
 from __future__ import annotations

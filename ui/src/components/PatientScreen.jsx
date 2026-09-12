@@ -1,11 +1,7 @@
-// The patient's display: a tablet or second screen facing the patient.
-// It knows as little as possible - the phase and the current stimulus -
-// and shows one calm thing at a time. No answers, no numbers, no controls.
-//
-// Auto-attach: with no session id it waits, polling for the newest running
-// session, and springs to life the moment the clinician begins - so the
-// iPad can sit on ?role=patient all day. When a session ends it goes back
-// to waiting, ready for the next one.
+// The patient's display. It knows only the phase and the current stimulus:
+// no answers, no numbers, no controls. With no session id it waits and
+// auto-attaches to the newest running session, so the iPad can sit on
+// ?role=patient all day; after a session ends it waits for the next.
 import { useState } from 'react';
 import { getCurrentSession, getPatientView } from '../api.js';
 import usePoll from '../hooks/usePoll.js';
