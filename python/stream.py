@@ -92,22 +92,25 @@ def _connect_lsl(name_prefix: str | None = None) -> None:
     LIVE mode passes "EE511" so a dummy rehearsal stream can never pass
     as the real amplifier."""
     global fs, ch_names, _lsl_ring, _lsl_write, _lsl_filled, _lsl_generation, lsl_name
-    from pylsl import StreamInlet, resolve_byprop, resolve_streams
+    from pylsl import StreamInlet, resolve_streams
 
-    # The eego host SHOULD declare type EEG; if it labels itself differently
-    # (LabRecorder showed the stream named "EE511-..."), fall back to any
-    # multi-channel stream rather than failing on a metadata nicety.
-    found = resolve_byprop("type", "EEG", timeout=5.0)
-    if not found:
-        found = [s for s in resolve_streams(wait_time=3.0) if s.channel_count() >= 8]
+    # Full scan, never first-answer: resolve_streams waits out the whole
+    # window and returns EVERY broadcast, so a dummy answering fast can
+    # never shadow the real amp when both are on the air. Prefer streams
+    # that declare type EEG; accept any multi-channel one otherwise (the
+    # eego host may label its type differently).
+    streams = resolve_streams(wait_time=3.0)
+    names = [s.name() for s in streams]
     if name_prefix:
-        names = [s.name() for s in found]
-        found = [s for s in found if s.name().startswith(name_prefix)]
+        found = [s for s in streams if s.name().startswith(name_prefix)]
         if not found:
             seen = f"saw {names}" if names else "saw no streams at all"
             raise RuntimeError(f"no LSL stream named {name_prefix}* - {seen}. Is the eego software streaming with LSL enabled, on this network?")
-    if not found:
-        raise RuntimeError("no LSL stream found - is 'enable LSL' on in the eego software, and are both machines on the same network?")
+    else:
+        eeg = [s for s in streams if s.type() == "EEG" and s.channel_count() >= 8]
+        found = eeg or [s for s in streams if s.channel_count() >= 8]
+        if not found:
+            raise RuntimeError("no LSL stream found - is 'enable LSL' on in the eego software, and are both machines on the same network?")
     inlet = StreamInlet(found[0], max_buflen=60)
     lsl_name = found[0].name()
     info = inlet.info()
