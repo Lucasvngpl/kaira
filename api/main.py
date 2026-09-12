@@ -64,6 +64,7 @@ LIVE_PREFIX = "EE511"
 
 source = {
     "mode": "test",  # test | live
+    "selected": None,  # explicit stream name chosen from the picker; None = auto
     "connected": False,
     "stream": None,  # LSL stream name when connected over LSL
     "fs": None,
@@ -83,7 +84,16 @@ def _attempt(mode: str) -> None:
             return  # the user switched modes while this attempt waited its turn
         source["attempting"] = True
         try:
-            if mode == "test":
+            picked = source["selected"]
+            if picked:
+                # An explicit pick from the dropdown wins over auto rules.
+                stream.SOURCE = "lsl"
+                stream.SYNTHETIC = False
+                stream.connect(name_prefix=picked)
+                source.update(connected=True, stream=stream.lsl_name,
+                              fs=stream.fs, channels=len(stream.ch_names),
+                              detail=f"selected stream: {stream.lsl_name}")
+            elif mode == "test":
                 stream.SOURCE = "lsl"
                 stream.SYNTHETIC = False
                 try:
@@ -114,8 +124,9 @@ def _attempt(mode: str) -> None:
         threading.Timer(5.0, _attempt, args=("live",)).start()
 
 
-def set_mode(mode: str) -> None:
+def set_mode(mode: str, selected: str | None = None) -> None:
     source["mode"] = mode
+    source["selected"] = selected
     source["connected"] = False
     source["detail"] = "connecting..."
     threading.Thread(target=_attempt, args=(mode,), daemon=True).start()
@@ -182,8 +193,9 @@ def _get(session_id: str) -> Session:
 def root() -> dict:
     return {
         "app": "kaira",
-        # "Demo signal" shows unless the REAL amp is verified connected.
-        "synthetic": not (source["mode"] == "live" and source["connected"]),
+        # "Demo signal" shows unless the connected stream IS the real amp,
+        # however it was chosen (live auto-rule or explicit pick).
+        "synthetic": not (source["connected"] and (source["stream"] or "").startswith(LIVE_PREFIX)),
         "domains": {d: tasks.has_tasks(d) for d in tasks.domains()},
         # The UI shades the live sparkline with the effort band; multiples are
         # DERIVED from decide's log thresholds so display and rule cannot drift.
@@ -198,12 +210,25 @@ def stream_status() -> dict:
 
 class ModeRequest(BaseModel):
     mode: Literal["test", "live"]
+    # Exact stream name from /stream/list to pin; omitted = auto rules.
+    name: str | None = None
 
 
 @app.post("/stream/mode")
 def stream_mode(req: ModeRequest) -> dict:
-    set_mode(req.mode)
+    set_mode(req.mode, req.name)
     return source
+
+
+@app.get("/stream/list")
+def stream_list() -> list[dict]:
+    """Every LSL broadcast visible right now (a ~3 s scan), for the picker."""
+    from pylsl import resolve_streams
+    return [
+        {"name": s.name(), "type": s.type(), "channels": s.channel_count(),
+         "srate": int(s.nominal_srate()), "host": s.hostname()}
+        for s in resolve_streams(wait_time=3.0)
+    ]
 
 
 @app.get("/session/current")

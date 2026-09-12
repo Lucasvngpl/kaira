@@ -4,7 +4,7 @@
 // can start).
 import { useState } from 'react';
 import { FiArrowUpRight } from 'react-icons/fi';
-import { startSession, getStreamStatus, setStreamMode, errorText } from '../api.js';
+import { startSession, getStreamStatus, setStreamMode, getStreamList, errorText } from '../api.js';
 import usePoll from '../hooks/usePoll.js';
 import '../styles/session.css';
 
@@ -22,6 +22,8 @@ export default function StartScreen({ info, onStarted }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [source, setSource] = useState(null); // /stream/status, polled
+  const [streams, setStreams] = useState(null); // /stream/list, on demand
+  const [scanning, setScanning] = useState(false);
 
   usePoll(
     async () => {
@@ -35,13 +37,23 @@ export default function StartScreen({ info, onStarted }) {
     true
   );
 
-  const pickMode = async (mode) => {
-    if (source?.mode === mode) return;
-    setSource((s) => ({ ...(s || {}), mode, connected: false, detail: 'connecting...' }));
+  const pickMode = async (mode, name = null) => {
+    setSource((s) => ({ ...(s || {}), mode, selected: name, connected: false, detail: 'connecting...' }));
     try {
-      setSource(await setStreamMode(mode));
+      setSource(await setStreamMode(mode, name));
     } catch (e) {
       setError(errorText(e));
+    }
+  };
+
+  const scan = async () => {
+    setScanning(true);
+    try {
+      setStreams(await getStreamList()); // ~3 s: the server scans the whole network
+    } catch (e) {
+      setError(errorText(e));
+    } finally {
+      setScanning(false);
     }
   };
 
@@ -117,6 +129,26 @@ export default function StartScreen({ info, onStarted }) {
             >
               Live amplifier
             </button>
+          </div>
+          <div className="sn-streams">
+            <button type="button" className="kr-btn" onClick={scan} disabled={scanning}>
+              {scanning ? 'Scanning…' : 'Scan for streams'}
+            </button>
+            {streams && (
+              <select
+                aria-label="Pick a specific stream"
+                value={source?.selected || ''}
+                onChange={(e) => pickMode(source?.mode || 'test', e.target.value || null)}
+              >
+                <option value="">Auto ({source?.mode === 'live' ? 'EE511 only' : 'any stream, else synthetic'})</option>
+                {streams.map((st) => (
+                  <option key={st.name} value={st.name}>
+                    {st.name} · {st.channels} ch · {st.srate} Hz · {st.host}
+                  </option>
+                ))}
+              </select>
+            )}
+            {streams && streams.length === 0 && <p className="kr-hint">No LSL streams visible.</p>}
           </div>
           {source?.mode === 'live' && source?.connected && (
             <p className="kr-hint">

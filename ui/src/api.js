@@ -26,8 +26,11 @@ export const getBaselineStatus = (id) =>
 
 // Signal source: which mode we're in and whether the amp is verified.
 export const getStreamStatus = () => client.get('/stream/status').then((r) => r.data);
-export const setStreamMode = (mode) =>
-  client.post('/stream/mode', { mode }).then((r) => r.data);
+export const setStreamMode = (mode, name = null) =>
+  client.post('/stream/mode', { mode, name }).then((r) => r.data);
+
+// Every LSL broadcast visible right now (a ~3 s scan on the server).
+export const getStreamList = () => client.get('/stream/list').then((r) => r.data);
 
 // The newest running session, for the patient display's auto-attach.
 export const getCurrentSession = () =>

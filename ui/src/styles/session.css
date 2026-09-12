@@ -693,3 +693,25 @@
   color: var(--text-secondary);
   line-height: 1.7;
 }
+
+
+/* Stream picker: a scan button and, once scanned, the pick-one dropdown. */
+.sn-streams {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
+
+.sn-streams select {
+  min-height: 36px;
+  padding: 0 10px;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-field);
+  font: inherit;
+  font-size: 13px;
+  color: var(--ink);
+  background: #fff;
+  max-width: 100%;
+}
