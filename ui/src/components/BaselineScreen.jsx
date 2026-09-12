@@ -2,12 +2,13 @@
 // done. Each poll also makes the backend take one baseline sample, so this
 // polling IS the measurement - stop polling and the baseline goes deaf.
 import { useRef, useState } from 'react';
-import { getBaselineStatus, skipBaseline } from '../api.js';
+import { getBaselineStatus, skipBaseline, errorText } from '../api.js';
 import usePoll from '../hooks/usePoll.js';
 import '../styles/session.css';
 
 export default function BaselineScreen({ sessionId, seconds, canSkip, onDone }) {
   const [progress, setProgress] = useState(0);
+  const [error, setError] = useState('');
   const firedRef = useRef(false); // onDone must fire once, not once per poll
 
   // Hand the outcome up: how long it really ran, and whether the signal
@@ -36,8 +37,10 @@ export default function BaselineScreen({ sessionId, seconds, canSkip, onDone }) 
   const skip = async () => {
     try {
       finish(await skipBaseline(sessionId));
-    } catch {
-      // Not fatal (e.g. real hardware refuses); the normal poll keeps going.
+    } catch (e) {
+      // The baseline keeps running either way, but the click must never
+      // look dead - say why the server refused.
+      setError(errorText(e));
     }
   };
 
@@ -71,6 +74,11 @@ export default function BaselineScreen({ sessionId, seconds, canSkip, onDone }) 
           <button className="kr-btn" onClick={skip}>
             Skip baseline (demo)
           </button>
+        )}
+        {error && (
+          <p className="kr-error" role="alert">
+            {error}
+          </p>
         )}
       </div>
     </div>

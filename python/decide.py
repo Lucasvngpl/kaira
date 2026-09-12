@@ -26,7 +26,7 @@ from dataclasses import dataclass, field
 LOW_LOAD = -0.30   # below this: not really trying (0.74x baseline)
 HIGH_LOAD = +0.30  # above this: working hard (1.35x baseline)
 
-START_LEVEL = 2  # our patients skew low-functioning, so start below the middle
+START_LEVEL = 3  # start mid-scale (team call, 2026-09-12): room to move both ways
 MIN_LEVEL = 1
 MAX_LEVEL = 5
 STEP = 1  # one level at a time; bigger jumps are hard to justify clinically
