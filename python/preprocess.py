@@ -34,6 +34,8 @@ proof that ASR removes artifacts without eating real brain rhythm.
 
 from __future__ import annotations
 
+import copy
+
 import numpy as np
 from scipy.signal import butter, sosfiltfilt
 
@@ -90,7 +92,7 @@ def calibrate(baseline_window: np.ndarray, fs: int, ch_names: list[str]) -> None
         # from its histogram internals; silence just those.
         with np.errstate(divide="ignore", invalid="ignore"):
             asr.fit(_highpass(baseline_window, fs)[rows, :])
-        _asr = (asr, tuple(rows))
+        _asr = (asr, tuple(rows))  # kept PRISTINE; _repair works on copies
     except Exception as exc:
         print(f"ASR calibration unavailable ({exc}); threshold-only trust")
         _asr = None  # raw mode: the strict threshold does all the gating
@@ -100,11 +102,15 @@ def _repair(window: np.ndarray, ch_names: list[str]) -> np.ndarray:
     if _asr is None:
         return window
     asr, fitted_rows = _asr
-    rows = list(fitted_rows)
-    if len(rows) != len(_reference_rows(ch_names)):
+    if fitted_rows != tuple(_reference_rows(ch_names)):
         return window  # montage changed since calibration; do not guess
+    # meegkit's transform is a STREAMING object: it carries filter tails and
+    # a covariance memory between calls, assuming contiguous chunks. Our
+    # windows overlap 87.5% poll to poll, so every repair starts from a
+    # fresh copy of the fitted state instead - stateless and deterministic,
+    # at the cost of a sub-millisecond deepcopy.
     out = window.copy()
-    out[rows, :] = asr.transform(window[rows, :])
+    out[list(fitted_rows), :] = copy.deepcopy(asr).transform(window[list(fitted_rows), :])
     return out
 
 
