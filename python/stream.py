@@ -91,6 +91,8 @@ def _connect_lsl(name_prefix: str | None = None) -> None:
     info = inlet.info()
     fs = int(round(info.nominal_srate()))
     n_ch = info.channel_count()
+    if fs <= 0:
+        raise RuntimeError(f"stream {found[0].name()!r} declares no fixed sampling rate - cannot window it; check the eego LSL settings")
     labels = []
     ch = info.desc().child("channels").child("channel")
     while not ch.empty():
@@ -119,10 +121,16 @@ def _connect_lsl(name_prefix: str | None = None) -> None:
 
     def _pull() -> None:
         global _lsl_write, _lsl_filled
+        import time as _t
+        last_data = _t.monotonic()
         while my_generation == _lsl_generation:
             chunk, _ = inlet.pull_chunk(timeout=1.0)
             if not chunk:
+                if _t.monotonic() - last_data > 3.0:
+                    print(f"LSL: no samples from {lsl_name} for {_t.monotonic() - last_data:.0f}s - stream stalled?")
+                    last_data = _t.monotonic()  # log every ~3s, not every loop
                 continue
+            last_data = _t.monotonic()
             arr = np.asarray(chunk, dtype=float).T  # (n_ch, n_new)
             with _rec_lock:
                 if _rec["file"] is not None:

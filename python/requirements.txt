@@ -6,5 +6,6 @@ python-multipart   # baseline-file upload endpoint
 pylsl              # LSL receive - the venue transport
 meegkit            # ASR artifact repair (asrpy is broken on numpy 2)
 mne                # reads .cnt recordings (validation + uploaded baselines)
+pyxdf              # reads .xdf recordings from LabRecorder
 antio              # mne's ANT .cnt backend
 brainflow          # direct-amp fallback path only

@@ -207,12 +207,14 @@ sessions: dict[str, Session] = {}
 
 # Session raises typed errors; map them to HTTP once, centrally.
 @app.exception_handler(ValueError)
-async def _bad_request(_: Request, exc: ValueError) -> JSONResponse:
+async def _bad_request(request: Request, exc: ValueError) -> JSONResponse:
+    print(f"400 on {request.url.path}: {exc}")
     return JSONResponse(status_code=400, content={"detail": str(exc)})
 
 
 @app.exception_handler(SessionStateError)
-async def _wrong_phase(_: Request, exc: SessionStateError) -> JSONResponse:
+async def _wrong_phase(request: Request, exc: SessionStateError) -> JSONResponse:
+    print(f"409 on {request.url.path}: {exc}")
     return JSONResponse(status_code=409, content={"detail": str(exc)})
 
 
@@ -357,6 +359,23 @@ async def baseline_file(session_id: str, file: UploadFile) -> dict:
             d = np.load(tmp, allow_pickle=False)
             windows, fs, names = d["windows"], int(d["fs"]), [str(c) for c in d["ch_names"]]
             data = np.concatenate(list(windows), axis=1)
+        elif suffix == ".xdf":
+            import pyxdf
+            streams, _ = pyxdf.load_xdf(tmp)
+            eeg = [st for st in streams
+                   if float(st["info"]["nominal_srate"][0]) > 0 and int(st["info"]["channel_count"][0]) >= 8]
+            if not eeg:
+                raise HTTPException(status_code=400, detail="no EEG stream found inside that .xdf")
+            st = max(eeg, key=lambda x: int(x["info"]["channel_count"][0]))
+            fs = int(round(float(st["info"]["nominal_srate"][0])))
+            data = np.asarray(st["time_series"], dtype=float).T
+            try:
+                chans = st["info"]["desc"][0]["channels"][0]["channel"]
+                names = [c["label"][0] for c in chans]
+            except (TypeError, KeyError, IndexError):
+                raise HTTPException(status_code=400, detail="that .xdf carries no channel labels - record with the eego stream selected, not a raw device")
+            if np.median(np.abs(data)) < 0.01:
+                data = data * 1e6  # stream was in volts; the pipeline speaks microvolts
         elif suffix == ".cnt":
             try:
                 import mne
@@ -365,7 +384,7 @@ async def baseline_file(session_id: str, file: UploadFile) -> dict:
             r = mne.io.read_raw_ant(tmp, preload=True, verbose="ERROR")
             data, fs, names = r.get_data() * 1e6, int(r.info["sfreq"]), r.ch_names
         else:
-            raise HTTPException(status_code=400, detail=f"unsupported file type {suffix!r} - drop a .cnt or .npz recording")
+            raise HTTPException(status_code=400, detail=f"unsupported file type {suffix!r} - drop a .cnt, .xdf or .npz recording")
 
         preprocess.calibrate(data[:, : min(fs * 20, data.shape[1])], fs, names)
         win = fs * 2

@@ -30,8 +30,10 @@ export default function BaselineScreen({ sessionId, seconds, canSkip, onDone }) 
         setProgress(st.progress);
         setPreviousAvailable(Boolean(st.previous_available));
         if (st.done) finish(st);
-      } catch {
-        // A missed poll keeps the last painted progress; the next one catches up.
+        setError('');
+      } catch (e) {
+        // Keep the last progress, but never look frozen silently.
+        setError(`Baseline polling failing: ${errorText(e)}`);
       }
     },
     1000,
@@ -124,7 +126,7 @@ export default function BaselineScreen({ sessionId, seconds, canSkip, onDone }) 
         <input
           ref={fileRef}
           type="file"
-          accept=".cnt,.npz"
+          accept=".cnt,.npz,.xdf"
           hidden
           onChange={(e) => adoptFile(e.target.files?.[0])}
         />

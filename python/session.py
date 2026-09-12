@@ -160,8 +160,12 @@ class Session:
         return preprocess.clean(window, stream.fs, stream.ch_names)
 
     def _sample(self) -> tuple[float, bool]:
-        """One absolute load reading through the (stub) signal chain."""
+        """One absolute load reading through the signal chain. A window too
+        short to analyse (stream just connected, or stalled) reads as an
+        untrusted zero instead of crashing the request."""
         cleaned, trusted = self._clean_window()
+        if cleaned.shape[1] < stream.fs // 2:
+            return 0.0, False
         return features.cognitive_load(cleaned, stream.fs, stream.ch_names), trusted
 
     def _spectrum(self, cleaned) -> dict:
@@ -372,6 +376,12 @@ class Session:
         actually worked on it, not one lucky window at submit time.
         """
         cleaned, trusted = self._clean_window()
+        if cleaned.shape[1] < stream.fs // 2:
+            # Not enough signal yet: an honest "untrusted" beats a 400 that
+            # freezes every readout on the run screen.
+            return {"load": 1.0, "trusted": False, "bars": None,
+                    "band": self._display_band(),
+                    "spectrum": {"freqs": [], "frontal": [], "parietal": []}}
         value = features.cognitive_load(cleaned, stream.fs, stream.ch_names)
         if self._baseline_done:
             if self._current is not None:

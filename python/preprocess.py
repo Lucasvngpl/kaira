@@ -129,6 +129,10 @@ def clean(window: np.ndarray, fs: int, ch_names: list[str]) -> tuple[np.ndarray,
     bad channels are masked out of the math, never dropped, so callers keep
     indexing by the names they passed in.
     """
+    if window.shape[1] < fs // 2:
+        # Too little signal to filter (stream just connected, or stalled):
+        # say "don't trust this" instead of crashing the request.
+        return window, False
     hp = _highpass(window, fs)
     repaired = _repair(hp, ch_names)
     referenced = _average_reference(repaired, ch_names)
