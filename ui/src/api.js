@@ -32,6 +32,11 @@ export const setStreamMode = (mode, name = null) =>
 // Every LSL broadcast visible right now (a ~3 s scan on the server).
 export const getStreamList = () => client.get('/stream/list').then((r) => r.data);
 
+// This machine's LAN address (for the patient QR) and whether a patient
+// display is currently alive.
+export const getNetInfo = () => client.get('/net/info').then((r) => r.data);
+export const getPatientStatus = () => client.get('/patient/status').then((r) => r.data);
+
 // The newest running session, for the patient display's auto-attach.
 export const getCurrentSession = () =>
   client.get('/session/current').then((r) => r.data.session_id);

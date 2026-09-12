@@ -6,7 +6,6 @@ import { useState } from 'react';
 import { getRoot } from './api.js';
 import usePoll from './hooks/usePoll.js';
 import Wordmark from './components/Wordmark.jsx';
-import RoleScreen from './components/RoleScreen.jsx';
 import PatientScreen from './components/PatientScreen.jsx';
 import StartScreen from './components/StartScreen.jsx';
 import BaselineScreen from './components/BaselineScreen.jsx';
@@ -26,14 +25,12 @@ const PATIENT_SESSION = new URLSearchParams(window.location.search).get('patient
 const INITIAL_ROLE = new URLSearchParams(window.location.search).get('role');
 
 // The patient display is its own tiny app: no topbar, no state machine.
-// Split at the top level (not an early return) so ClinicianApp's hooks
-// stay unconditional - the rules of hooks are part of the house style.
-// ?demo=report skips the role question: it exists for UI work, always clinician.
+// There is no role chooser: this device is the clinician's unless the URL
+// says otherwise, and ?role=patient arrives by scanning the QR on the
+// start screen (or the topbar link, the no-iPad fallback).
 export default function App() {
-  const [role, setRole] = useState(INITIAL_ROLE || (DEMO ? 'clinician' : null));
   if (PATIENT_SESSION) return <PatientScreen sessionId={PATIENT_SESSION} />;
-  if (role === 'patient') return <PatientScreen />;
-  if (role !== 'clinician') return <RoleScreen onChoose={setRole} />;
+  if (INITIAL_ROLE === 'patient') return <PatientScreen />;
   return <ClinicianApp />;
 }
 

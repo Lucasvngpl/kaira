@@ -577,68 +577,34 @@
 }
 
 
-/* ---- Role choice: the first screen on any device ------------------------------ */
+/* ---- Patient QR card ------------------------------------------------------------
+   Sits beside the start form: scan on any device on this hotspot and it
+   becomes the patient screen. The session cannot start until one is alive. */
 
-.sn-role {
-  min-height: 70dvh;
+.sn-start__row {
   display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 28px;
-}
-
-.sn-role__title {
-  font-size: 1.6rem;
-  font-weight: 600;
-  margin: 0;
-}
-
-.sn-role__choices {
-  display: flex;
-  gap: 16px;
-  flex-wrap: wrap;
-  justify-content: center;
-}
-
-.sn-role__choice {
-  width: 240px;
-  display: flex;
-  flex-direction: column;
+  gap: 18px;
   align-items: flex-start;
-  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.sn-qr {
+  width: 260px;
   padding: 20px 22px;
-  border: 1px solid var(--border-soft);
-  border-radius: var(--radius-md);
-  background: #fff;
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-  transition: border-color 0.12s, transform 0.14s var(--ease-out);
+  gap: 10px;
 }
 
-.sn-role__choice:hover {
-  border-color: var(--ink);
+.sn-qr img {
+  width: 180px;
+  height: 180px;
+  image-rendering: pixelated; /* crisp modules beat smoothing for QR */
 }
 
-.sn-role__choice:active {
-  transform: scale(0.98);
-}
-
-.sn-role__choice svg {
-  width: 20px;
-  height: 20px;
-}
-
-.sn-role__choice span {
-  font-size: 16px;
-  font-weight: 600;
-}
-
-.sn-role__choice small {
-  font-size: 12.5px;
-  color: var(--text-secondary);
-  line-height: 1.45;
+.sn-qr__url {
+  font-size: 11.5px;
+  color: var(--text-tertiary);
+  word-break: break-all;
+  font-variant-numeric: tabular-nums;
 }
 
 /* ---- Signal-source toggle + live checklist ------------------------------------ */

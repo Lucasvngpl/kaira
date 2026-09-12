@@ -2,9 +2,13 @@
 // Also home of the signal-source switch: Test (dummy stream or generator)
 // vs Live (only the real EE511 amplifier counts, verified before anything
 // can start).
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { FiArrowUpRight } from 'react-icons/fi';
-import { startSession, getStreamStatus, setStreamMode, getStreamList, errorText } from '../api.js';
+import QRCode from 'qrcode';
+import {
+  startSession, getStreamStatus, setStreamMode, getStreamList,
+  getNetInfo, getPatientStatus, errorText,
+} from '../api.js';
 import usePoll from '../hooks/usePoll.js';
 import '../styles/session.css';
 
@@ -24,6 +28,39 @@ export default function StartScreen({ info, onStarted }) {
   const [source, setSource] = useState(null); // /stream/status, polled
   const [streams, setStreams] = useState(null); // /stream/list, on demand
   const [scanning, setScanning] = useState(false);
+  const [qr, setQr] = useState(null); // {img, url} for the patient entrance
+  const [patientOn, setPatientOn] = useState(false);
+
+  // The QR encodes THIS ui served at the machine's LAN address, so any
+  // device on the hotspot lands straight on the patient screen.
+  useEffect(() => {
+    (async () => {
+      try {
+        const { ip } = await getNetInfo();
+        const url = `http://${ip}:${window.location.port || 80}/?role=patient`;
+        setQr({ img: await QRCode.toDataURL(url, { margin: 1, width: 360 }), url });
+      } catch {
+        // API not up yet; the banner covers it, and we retry via the poll below.
+      }
+    })();
+  }, []);
+
+  usePoll(
+    async () => {
+      try {
+        setPatientOn((await getPatientStatus()).connected);
+        if (!qr) {
+          const { ip } = await getNetInfo();
+          const url = `http://${ip}:${window.location.port || 80}/?role=patient`;
+          setQr({ img: await QRCode.toDataURL(url, { margin: 1, width: 360 }), url });
+        }
+      } catch {
+        setPatientOn(false);
+      }
+    },
+    2000,
+    true
+  );
 
   usePoll(
     async () => {
@@ -58,6 +95,7 @@ export default function StartScreen({ info, onStarted }) {
   };
 
   const liveBlocked = source?.mode === 'live' && !source?.connected;
+  const blocked = liveBlocked || !patientOn;
 
   // Until GET / answers, offer the one domain we know is populated rather
   // than an empty select.
@@ -88,6 +126,7 @@ export default function StartScreen({ info, onStarted }) {
         <p>Fit the cap, seat the patient, and start with a short resting baseline.</p>
       </header>
 
+      <div className="sn-start__row">
       <form className="kr-card sn-start__card" onSubmit={submit}>
         <div className="kr-field">
           <label htmlFor="patient-ref">Patient reference</label>
@@ -176,9 +215,15 @@ export default function StartScreen({ info, onStarted }) {
         <button
           className="kr-action kr-action--primary kr-action--hero"
           type="submit"
-          disabled={busy || liveBlocked}
+          disabled={busy || blocked}
         >
-          {busy ? 'Starting session' : liveBlocked ? 'Waiting for amplifier' : 'Begin baseline'}
+          {busy
+            ? 'Starting session'
+            : liveBlocked
+              ? 'Waiting for amplifier'
+              : !patientOn
+                ? 'Waiting for patient screen'
+                : 'Begin baseline'}
           <FiArrowUpRight aria-hidden="true" />
         </button>
 
@@ -188,6 +233,30 @@ export default function StartScreen({ info, onStarted }) {
           </p>
         )}
       </form>
+
+      <aside className="kr-card sn-qr">
+        <div className="kr-card__head" style={{ padding: 0 }}>
+          <h2 className="kr-cardtitle">Patient screen</h2>
+          {patientOn ? (
+            <span className="kr-chip"><i />Connected</span>
+          ) : (
+            <span className="kr-chip kr-chip--warn">Not connected</span>
+          )}
+        </div>
+        {qr ? (
+          <>
+            <img src={qr.img} alt="QR code that opens the patient screen" />
+            <p className="kr-hint">
+              Scan on any device on this network. It becomes the patient's display and the
+              session can start.
+            </p>
+            <p className="sn-qr__url">{qr.url}</p>
+          </>
+        ) : (
+          <p className="kr-hint">Waiting for the server to report its address&hellip;</p>
+        )}
+      </aside>
+      </div>
     </div>
   );
 }

@@ -28,7 +28,9 @@ from pydantic import BaseModel, Field
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "python"))
 
 import math
+import socket
 import threading
+import time
 
 import decide  # noqa: E402
 import session as session_mod  # noqa: E402
@@ -61,6 +63,29 @@ from contextlib import asynccontextmanager
 # state one dict, all the work one background thread per request.
 
 LIVE_PREFIX = "EE511"
+
+# The patient display proves it is alive by polling; the clinician cannot
+# start a session no patient screen would show. 5 s of silence = gone.
+_patient_seen = 0.0
+PATIENT_TIMEOUT = 5.0
+
+
+def _patient_connected() -> bool:
+    return (time.time() - _patient_seen) > 0 and (time.time() - _patient_seen) < PATIENT_TIMEOUT
+
+
+def _lan_ip() -> str:
+    """This machine's address on the local network (hotspot). The UDP
+    connect never sends a packet; it just asks the OS which interface would
+    route there, which works with or without real internet."""
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        s.connect(("8.8.8.8", 80))
+        return s.getsockname()[0]
+    except OSError:
+        return "127.0.0.1"
+    finally:
+        s.close()
 
 source = {
     "mode": "test",  # test | live
@@ -231,9 +256,21 @@ def stream_list() -> list[dict]:
     ]
 
 
+@app.get("/net/info")
+def net_info() -> dict:
+    return {"ip": _lan_ip()}
+
+
+@app.get("/patient/status")
+def patient_status() -> dict:
+    return {"connected": _patient_connected()}
+
+
 @app.get("/session/current")
 def session_current() -> dict:
-    # The patient display auto-attaches to the newest session still running.
+    # Only the patient display polls this - it doubles as its heartbeat.
+    global _patient_seen
+    _patient_seen = time.time()
     for s in reversed(list(sessions.values())):
         if not s.ended:
             return {"session_id": s.id}
@@ -244,6 +281,8 @@ def session_current() -> dict:
 def start(req: StartRequest) -> dict:
     if source["mode"] == "live" and not source["connected"]:
         raise SessionStateError("live mode is selected but the amplifier is not connected yet")
+    if not _patient_connected():
+        raise SessionStateError("no patient screen is connected - scan the QR code on any device on this network")
     s = session_mod.begin(req.patient_ref, req.domain)
     sessions[s.id] = s
     return {"session_id": s.id, "baseline_seconds": session_mod.BASELINE_SECONDS}
@@ -284,6 +323,8 @@ def live_load(session_id: str) -> dict:
 
 @app.get("/session/{session_id}/patient-view")
 def patient_view(session_id: str) -> dict:
+    global _patient_seen
+    _patient_seen = time.time()
     return _get(session_id).patient_view()
 
 
