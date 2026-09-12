@@ -24,6 +24,15 @@ export const startSession = (patient_ref, domain) =>
 export const getBaselineStatus = (id) =>
   client.get(`/session/${id}/baseline-status`).then((r) => r.data);
 
+// Signal source: which mode we're in and whether the amp is verified.
+export const getStreamStatus = () => client.get('/stream/status').then((r) => r.data);
+export const setStreamMode = (mode) =>
+  client.post('/stream/mode', { mode }).then((r) => r.data);
+
+// The newest running session, for the patient display's auto-attach.
+export const getCurrentSession = () =>
+  client.get('/session/current').then((r) => r.data.session_id);
+
 // Demo-only (400 on real hardware): ends the baseline immediately.
 export const skipBaseline = (id) =>
   client.post(`/session/${id}/baseline-skip`).then((r) => r.data);

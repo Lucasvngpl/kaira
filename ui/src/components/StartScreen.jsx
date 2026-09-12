@@ -1,14 +1,51 @@
 // New-assessment form: patient reference + domain, then hand off to baseline.
+// Also home of the signal-source switch: Test (dummy stream or generator)
+// vs Live (only the real EE511 amplifier counts, verified before anything
+// can start).
 import { useState } from 'react';
 import { FiArrowUpRight } from 'react-icons/fi';
-import { startSession, errorText } from '../api.js';
+import { startSession, getStreamStatus, setStreamMode, errorText } from '../api.js';
+import usePoll from '../hooks/usePoll.js';
 import '../styles/session.css';
+
+// What to check, in the order things actually go wrong on the day.
+const LIVE_CHECKLIST = [
+  'eego software: Network operations, enable LSL, streaming started',
+  'Both machines on the same hotspot or network',
+  'Windows firewall on the eego machine: allow the eego app',
+  'Isolating wifi (eduroam/guest): lsl_api.cfg with KnownPeers = {host ip}',
+];
 
 export default function StartScreen({ info, onStarted }) {
   const [patientRef, setPatientRef] = useState('');
   const [domain, setDomain] = useState('Visuospatial');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [source, setSource] = useState(null); // /stream/status, polled
+
+  usePoll(
+    async () => {
+      try {
+        setSource(await getStreamStatus());
+      } catch {
+        // API not up yet; the reachability banner covers that case.
+      }
+    },
+    2000,
+    true
+  );
+
+  const pickMode = async (mode) => {
+    if (source?.mode === mode) return;
+    setSource((s) => ({ ...(s || {}), mode, connected: false, detail: 'connecting...' }));
+    try {
+      setSource(await setStreamMode(mode));
+    } catch (e) {
+      setError(errorText(e));
+    }
+  };
+
+  const liveBlocked = source?.mode === 'live' && !source?.connected;
 
   // Until GET / answers, offer the one domain we know is populated rather
   // than an empty select.
@@ -63,8 +100,53 @@ export default function StartScreen({ info, onStarted }) {
           </select>
         </div>
 
-        <button className="kr-action kr-action--primary kr-action--hero" type="submit" disabled={busy}>
-          {busy ? 'Starting session' : 'Begin baseline'}
+        <div className="kr-field">
+          <label>Signal source</label>
+          <div className="sn-seg" role="radiogroup" aria-label="Signal source">
+            <button
+              type="button"
+              className={`sn-seg__opt${source?.mode !== 'live' ? ' sn-seg__opt--on' : ''}`}
+              onClick={() => pickMode('test')}
+            >
+              Test signal
+            </button>
+            <button
+              type="button"
+              className={`sn-seg__opt${source?.mode === 'live' ? ' sn-seg__opt--on' : ''}`}
+              onClick={() => pickMode('live')}
+            >
+              Live amplifier
+            </button>
+          </div>
+          {source?.mode === 'live' && source?.connected && (
+            <p className="kr-hint">
+              Amplifier verified: {source.stream} &middot; {source.fs} Hz &middot; {source.channels} channels
+            </p>
+          )}
+          {source?.mode !== 'live' && source?.connected && (
+            <p className="kr-hint">Using {source.detail}. Nothing here is a real patient.</p>
+          )}
+          {liveBlocked && (
+            <div className="sn-lsl" role="status">
+              <p className="sn-lsl__head">Looking for the amplifier&hellip; retrying every few seconds.</p>
+              {source?.detail && source.detail !== 'connecting...' && (
+                <p className="sn-lsl__detail">{source.detail}</p>
+              )}
+              <ul className="sn-lsl__list">
+                {LIVE_CHECKLIST.map((step) => (
+                  <li key={step}>{step}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+
+        <button
+          className="kr-action kr-action--primary kr-action--hero"
+          type="submit"
+          disabled={busy || liveBlocked}
+        >
+          {busy ? 'Starting session' : liveBlocked ? 'Waiting for amplifier' : 'Begin baseline'}
           <FiArrowUpRight aria-hidden="true" />
         </button>
 

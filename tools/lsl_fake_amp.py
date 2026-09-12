@@ -10,6 +10,7 @@ real host would send (just 64 channels instead of the EE-511's 24).
 
 from __future__ import annotations
 
+import argparse
 import time
 
 import mne
@@ -21,12 +22,18 @@ CHUNK = 32  # samples per push: 16 pushes/s at 512 Hz, LSL-typical
 
 
 def main() -> None:
+    p = argparse.ArgumentParser(description="Broadcast the EO-EC recording over LSL")
+    # Default name is deliberately NOT EE511*: the UI's LIVE mode only accepts
+    # the real amp's prefix. Pass --name EE511-REHEARSAL to drill the live path.
+    p.add_argument("--name", default="kaira-fake-eego")
+    args = p.parse_args()
+
     raw = mne.io.read_raw_ant(CNT, preload=True, verbose="ERROR")
     fs = int(raw.info["sfreq"])
     data = raw.get_data() * 1e6  # volts -> microvolts, like the eego host streams
     n_ch = data.shape[0]
 
-    info = StreamInfo("kaira-fake-eego", "EEG", n_ch, fs, "float32", "kaira-fake")
+    info = StreamInfo(args.name, "EEG", n_ch, fs, "float32", "kaira-fake")
     chans = info.desc().append_child("channels")
     for name in raw.ch_names:
         chans.append_child("channel").append_child_value("label", name)

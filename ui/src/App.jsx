@@ -6,6 +6,7 @@ import { useState } from 'react';
 import { getRoot } from './api.js';
 import usePoll from './hooks/usePoll.js';
 import Wordmark from './components/Wordmark.jsx';
+import RoleScreen from './components/RoleScreen.jsx';
 import PatientScreen from './components/PatientScreen.jsx';
 import StartScreen from './components/StartScreen.jsx';
 import BaselineScreen from './components/BaselineScreen.jsx';
@@ -18,16 +19,22 @@ import ReportScreen from './components/ReportScreen.jsx';
 // rest of the navigation.
 const DEMO = new URLSearchParams(window.location.search).get('demo');
 
-// ?patient=<session id> turns this tab into the patient's display - the one
-// sanctioned deep link, because the second screen must be able to join a
-// session that is already running.
+// ?patient=<session id> pins the patient display to ONE session (legacy
+// link); ?role=patient auto-attaches to whatever session is running - the
+// iPad bookmarks that and never needs another URL.
 const PATIENT_SESSION = new URLSearchParams(window.location.search).get('patient');
+const INITIAL_ROLE = new URLSearchParams(window.location.search).get('role');
 
 // The patient display is its own tiny app: no topbar, no state machine.
 // Split at the top level (not an early return) so ClinicianApp's hooks
 // stay unconditional - the rules of hooks are part of the house style.
+// ?demo=report skips the role question: it exists for UI work, always clinician.
 export default function App() {
-  return PATIENT_SESSION ? <PatientScreen sessionId={PATIENT_SESSION} /> : <ClinicianApp />;
+  const [role, setRole] = useState(INITIAL_ROLE || (DEMO ? 'clinician' : null));
+  if (PATIENT_SESSION) return <PatientScreen sessionId={PATIENT_SESSION} />;
+  if (role === 'patient') return <PatientScreen />;
+  if (role !== 'clinician') return <RoleScreen onChoose={setRole} />;
+  return <ClinicianApp />;
 }
 
 function ClinicianApp() {
@@ -70,9 +77,10 @@ function ClinicianApp() {
             </span>
           )}
           {/* Opens the patient-facing display in its own tab, to be dragged
-              onto the tablet / second screen. Live phases only. */}
+              onto the tablet / second screen. It auto-attaches, so the same
+              URL works for every future session. */}
           {session && phase !== 'report' && (
-            <a className="kr-btn" href={`?patient=${session.id}`} target="_blank" rel="noreferrer">
+            <a className="kr-btn" href="?role=patient" target="_blank" rel="noreferrer">
               Patient screen
             </a>
           )}
