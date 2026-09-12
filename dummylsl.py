@@ -19,7 +19,7 @@ def create_64ch_dummy_lsl():
     name = 'DummyEEG_64Ch'
     stream_type = 'EEG'
     channels = len(ch_names)  # Automatically sets to 64
-    sample_rate = 100.0  
+    sample_rate = 512.0  # match the real EE-511 config so rehearsals are faithful
     data_type = 'float32'
     unique_id = 'dummy_64ch_eeg_98765'
 
@@ -48,12 +48,18 @@ def create_64ch_dummy_lsl():
     print(f"Streaming '{name}' with {channels} channels initialized.")
     print("Press Ctrl+C to stop the stream.")
     
+    # Chunked pushes: per-sample sleep can't keep pace at 512 Hz, and
+    # +-25 uV keeps the noise inside physiological range so preprocess's
+    # 150 uV artifact gate trusts it (uniform +-50 tripped the gate).
+    chunk_size = 32
     try:
         while True:
-            # Generate a random float value for all 64 channels
-            sample = [random.uniform(-50.0, 50.0) for _ in range(channels)]
-            outlet.push_sample(sample)
-            time.sleep(1.0 / sample_rate)
+            chunk = [
+                [random.uniform(-25.0, 25.0) for _ in range(channels)]
+                for _ in range(chunk_size)
+            ]
+            outlet.push_chunk(chunk)
+            time.sleep(chunk_size / sample_rate)
     except KeyboardInterrupt:
         print("\n64-channel stream stopped.")
 
