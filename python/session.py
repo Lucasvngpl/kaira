@@ -77,6 +77,12 @@ assert set(features.FRONTAL + features.PARIETAL) <= set(stream.ch_names), \
 # a tiny SD and absurd z-scores. The floor caps that amplification.
 BASELINE_SD_FLOOR = 0.05
 
+# Cap-settling spikes (200x readings right after the cap goes on) pass the
+# amplitude gate but would poison the ruler: any baseline sample further
+# than ln(10) (~10x) from the running median of what's collected is
+# discarded - it costs one sample, never the baseline.
+BASELINE_OUTLIER_LOG = math.log(10.0)
+
 # The movement word for the report's action column. decide's six reasons
 # collapse to four movements: hitting the ceiling displays as "hold" and
 # hitting the floor as "repeat", because either way the level stayed put.
@@ -215,7 +221,7 @@ class Session:
         if not self._baseline_done:
             self._ensure_calibrated(elapsed)
             value, trusted = self._sample()
-            if trusted:
+            if trusted and not self._baseline_outlier(value):
                 self._baseline_samples.append((elapsed, value))
             adaptive = BASELINE_SECONDS > BASELINE_MIN_SECONDS  # rehearsal overrides skip settling
             if adaptive and elapsed >= BASELINE_MIN_SECONDS and self._settled(elapsed):
@@ -230,6 +236,12 @@ class Session:
             "stable": self.baseline_stable,
             "seconds": round(self.baseline_seconds if self._baseline_done else elapsed, 1),
         }
+
+    def _baseline_outlier(self, value: float) -> bool:
+        if len(self._baseline_samples) < 3:
+            return False  # need a few seeds before a median means anything
+        med = statistics.median(v for _, v in self._baseline_samples)
+        return abs(value - med) > BASELINE_OUTLIER_LOG
 
     def _settled(self, now: float) -> bool:
         """Has the signal settled? The last 30 s vs the 30 s before that."""
