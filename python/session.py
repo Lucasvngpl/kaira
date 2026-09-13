@@ -148,6 +148,7 @@ class Session:
         self._calibrated = False  # preprocess blink-removal, done once mid-baseline
         self.baseline_seconds = 0.0  # how long the baseline actually ran
         self.baseline_stable = True  # False only when the settling check ran and never passed
+        self._baseline_outliers = 0  # spiked readings ignored, surfaced to the clinician
         # Task bookkeeping.
         self._current: tasks.Task | None = None
         self.task_running = False  # True between the clinician's Start and their verdict
@@ -221,7 +222,9 @@ class Session:
         if not self._baseline_done:
             self._ensure_calibrated(elapsed)
             value, trusted = self._sample()
-            if trusted and not self._baseline_outlier(value):
+            if trusted and self._baseline_outlier(value):
+                self._baseline_outliers += 1  # shown, never counted
+            elif trusted:
                 self._baseline_samples.append((elapsed, value))
             adaptive = BASELINE_SECONDS > BASELINE_MIN_SECONDS  # rehearsal overrides skip settling
             if adaptive and elapsed >= BASELINE_MIN_SECONDS and self._settled(elapsed):
@@ -235,6 +238,7 @@ class Session:
             "progress": min(1.0, elapsed / BASELINE_SECONDS),
             "stable": self.baseline_stable,
             "seconds": round(self.baseline_seconds if self._baseline_done else elapsed, 1),
+            "outliers": self._baseline_outliers,
         }
 
     def _baseline_outlier(self, value: float) -> bool:

@@ -11,6 +11,7 @@ export default function BaselineScreen({ sessionId, seconds, canSkip, onDone }) 
   const [error, setError] = useState('');
   const [previousAvailable, setPreviousAvailable] = useState(false);
   const [defaultName, setDefaultName] = useState(null);
+  const [outliers, setOutliers] = useState(0);
   const [uploading, setUploading] = useState(false);
   const fileRef = useRef(null);
   const firedRef = useRef(false); // onDone must fire once, not once per poll
@@ -31,6 +32,7 @@ export default function BaselineScreen({ sessionId, seconds, canSkip, onDone }) 
         setProgress(st.progress);
         setPreviousAvailable(Boolean(st.previous_available));
         setDefaultName(st.default_baseline || null);
+        setOutliers(st.outliers || 0);
         if (st.done) finish(st);
         setError('');
       } catch (e) {
@@ -116,6 +118,11 @@ export default function BaselineScreen({ sessionId, seconds, canSkip, onDone }) 
         <p className="sn-baseline__count">
           {remaining > 0 ? `Up to ${remainingText} left` : 'Computing baseline'}
         </p>
+        {outliers > 0 && (
+          <span className="kr-chip kr-chip--demo">
+            {outliers} spiked reading{outliers === 1 ? '' : 's'} ignored, not counted toward the baseline
+          </span>
+        )}
         {/* Only the real protocol adapts; short rehearsal baselines just run out. */}
         {seconds > 90 && <p className="kr-hint">Ends early once the signal settles.</p>}
         {/* Demo-only escape hatch for UI testing; the server refuses it on
